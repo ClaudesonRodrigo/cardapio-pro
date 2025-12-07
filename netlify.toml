@@ -1,5 +1,24 @@
+# Configurações de Build (Produção e Branches)
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+# Garante que o plugin do Next.js seja usado (essencial para SSR/API Routes)
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Configurações do Ambiente Local (Netlify Dev)
 [dev]
   command = "npm run dev"
   targetPort = 3000
   port = 8888
   autoLaunch = false
+
+# (Opcional) Configurações específicas para a branch develop
+# Isso cria um ambiente "Staging"
+[context.develop]
+  command = "npm run build"
+  
+# (Opcional) Variáveis de ambiente específicas para develop se precisar
+# [context.develop.environment]
+#   NEXT_PUBLIC_API_URL = "https://api-dev.exemplo.com"
