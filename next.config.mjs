@@ -6,7 +6,7 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
-  disable: process.env.NODE_ENV === "development", // Desativa em desenvolvimento para não atrapalhar
+  disable: process.env.NODE_ENV === "development",
   workboxOptions: {
     disableDevLogs: true,
   },
@@ -14,6 +14,9 @@ const withPWA = withPWAInit({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // AQUI ESTÁ O TRUQUE: Gera uma build focada e menor
+  output: "standalone", 
+  
   images: {
     remotePatterns: [
       {
