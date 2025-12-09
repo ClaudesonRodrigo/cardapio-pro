@@ -6,29 +6,30 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebaseClient";
 
-// ATUALIZADO: Agora suporta estrutura de Pratos/Produtos
 export type LinkData = {
   title: string;
-  url?: string; // Opcional agora (pode ser só visualização)
+  url?: string;
   type: string; 
   order: number;
   icon?: string;
   clicks?: number;
-  // Novos campos para Cardápio Digital
   price?: string;
   description?: string;
   imageUrl?: string;
+  category?: string;
 };
 
 export type PageData = {
   title: string;
   bio: string;
+  address?: string;
   profileImageUrl?: string;
   backgroundImage?: string;
-  links: LinkData[]; // Mantivemos o nome 'links' no banco para compatibilidade, mas no front trataremos como 'itens/pratos'
+  links: LinkData[];
   theme?: string;
   userId: string;
   slug: string;
+  plan?: string; // NOVO: Vamos passar o plano para o front
 };
 
 export type UserData = {
@@ -39,67 +40,106 @@ export type UserData = {
   role?: string;
 };
 
-// ... (Restante das funções getPageDataForUser, addLinkToPage, etc. permanecem iguais, pois manipulam o objeto genérico)
+// --- Funções de Leitura ---
 
 export const getPageDataForUser = async (userId: string): Promise<{ slug: string, data: DocumentData } | null> => {
   try {
     const userDocRef = doc(db, "users", userId);
     const userDocSnap = await getDoc(userDocRef);
 
-    if (!userDocSnap.exists()) {
-      return null;
-    }
+    if (!userDocSnap.exists()) return null;
 
-    const pageSlug = userDocSnap.data()?.pageSlug;
+    const userData = userDocSnap.data();
+    const pageSlug = userData?.pageSlug;
+    
     if (!pageSlug) {
+      // Fallback
       const pagesRef = collection(db, "pages");
       const q = query(pagesRef, where("userId", "==", userId));
       const pagesSnap = await getDocs(q);
       if (!pagesSnap.empty) {
         const pageDoc = pagesSnap.docs[0];
-        return { slug: pageDoc.id, data: pageDoc.data() };
-      } else {
-         return null;
+        // Injetamos o plano nos dados da página para facilitar o controle no front
+        return { slug: pageDoc.id, data: { ...pageDoc.data(), plan: userData?.plan || 'free' } };
       }
+      return null;
     }
 
     const pageDocRef = doc(db, "pages", pageSlug);
     const pageDocSnap = await getDoc(pageDocRef);
 
     if (pageDocSnap.exists()) {
-      return { slug: pageSlug, data: pageDocSnap.data() };
-    } else {
-      return null;
+       return { slug: pageSlug, data: { ...pageDocSnap.data(), plan: userData?.plan || 'free' } };
     }
+    return null;
+
   } catch (error) {
-    console.error("Erro:", error);
+    console.error("Erro ao buscar dados:", error);
     return null;
   }
 };
 
+export const getPageDataBySlug = async (slug: string): Promise<DocumentData | null> => {
+  try {
+    const pageDocRef = doc(db, "pages", slug);
+    const pageDocSnap = await getDoc(pageDocRef);
+    
+    if (!pageDocSnap.exists()) return null;
+
+    const pageData = pageDocSnap.data();
+
+    // Precisamos buscar o usuário dono dessa página para saber o plano dele
+    // Isso garante que se ele deixar de pagar, o recurso some da página pública
+    if (pageData.userId) {
+        const userDocRef = doc(db, "users", pageData.userId);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+            return { ...pageData, plan: userDocSnap.data().plan || 'free' };
+        }
+    }
+
+    return { ...pageData, plan: 'free' }; // Default se não achar user
+  } catch (error) {
+    return null;
+  }
+};
+
+// --- Funções de Escrita ---
+
 export const addLinkToPage = async (pageSlug: string, newLink: LinkData): Promise<void> => {
   const pageDocRef = doc(db, "pages", pageSlug);
-  await updateDoc(pageDocRef, {
-    links: arrayUnion(newLink)
-  });
+  await updateDoc(pageDocRef, { links: arrayUnion(newLink) });
 };
 
 export const deleteLinkFromPage = async (pageSlug: string, linkToDelete: LinkData): Promise<void> => {
   const pageDocRef = doc(db, "pages", pageSlug);
-  await updateDoc(pageDocRef, {
-    links: arrayRemove(linkToDelete)
-  });
+  await updateDoc(pageDocRef, { links: arrayRemove(linkToDelete) });
 };
 
 export const updateLinksOnPage = async (pageSlug: string, updatedLinks: LinkData[]): Promise<void> => {
   const pageDocRef = doc(db, "pages", pageSlug);
-  await updateDoc(pageDocRef, {
-    links: updatedLinks
-  });
+  await updateDoc(pageDocRef, { links: updatedLinks });
 };
 
-export const incrementLinkClick = async (pageSlug: string, linkUrl: string): Promise<void> => {
-  // Para cardápio, pode ser usado para contar "cliques no prato" (ex: abrir foto ou detalhe)
+export const updatePageTheme = async (pageSlug: string, theme: string): Promise<void> => {
+  await updateDoc(doc(db, "pages", pageSlug), { theme });
+};
+
+export const updatePageBackground = async (pageSlug: string, imageUrl: string): Promise<void> => {
+  await updateDoc(doc(db, "pages", pageSlug), { backgroundImage: imageUrl });
+};
+
+export const updateProfileImage = async (pageSlug: string, imageUrl: string): Promise<void> => {
+  await updateDoc(doc(db, "pages", pageSlug), { profileImageUrl: imageUrl });
+};
+
+export const updatePageProfileInfo = async (pageSlug: string, title: string, bio: string, address: string): Promise<void> => {
+  await updateDoc(doc(db, "pages", pageSlug), { title, bio, address });
+};
+
+// --- Outras Funções ---
+
+export const incrementLinkClick = async (pageSlug: string, itemId: string): Promise<void> => {
   try {
     const pageDocRef = doc(db, "pages", pageSlug);
     const pageSnap = await getDoc(pageDocRef);
@@ -107,7 +147,7 @@ export const incrementLinkClick = async (pageSlug: string, linkUrl: string): Pro
     if (pageSnap.exists()) {
       const pageData = pageSnap.data() as PageData;
       const links = pageData.links || [];
-      const linkIndex = links.findIndex(l => l.title === linkUrl || l.url === linkUrl); // Adaptado para buscar por título também
+      const linkIndex = links.findIndex(l => l.title === itemId || l.url === itemId);
 
       if (linkIndex !== -1) {
         const updatedLinks = [...links];
@@ -116,39 +156,7 @@ export const incrementLinkClick = async (pageSlug: string, linkUrl: string): Pro
         await updateDoc(pageDocRef, { links: updatedLinks });
       }
     }
-  } catch (error) {
-    console.error(error);
-  }
-};
-
-export const getPageDataBySlug = async (slug: string): Promise<DocumentData | null> => {
-  try {
-    const pageDocRef = doc(db, "pages", slug);
-    const pageDocSnap = await getDoc(pageDocRef);
-    return pageDocSnap.exists() ? pageDocSnap.data() : null;
-  } catch (error) {
-    return null;
-  }
-};
-
-export const updatePageTheme = async (pageSlug: string, theme: string): Promise<void> => {
-  const pageDocRef = doc(db, "pages", pageSlug);
-  await updateDoc(pageDocRef, { theme: theme });
-};
-
-export const updatePageBackground = async (pageSlug: string, imageUrl: string): Promise<void> => {
-  const pageDocRef = doc(db, "pages", pageSlug);
-  await updateDoc(pageDocRef, { backgroundImage: imageUrl });
-};
-
-export const updateProfileImage = async (pageSlug: string, imageUrl: string): Promise<void> => {
-  const pageDocRef = doc(db, "pages", pageSlug);
-  await updateDoc(pageDocRef, { profileImageUrl: imageUrl });
-};
-
-export const updatePageProfileInfo = async (pageSlug: string, title: string, bio: string): Promise<void> => {
-  const pageDocRef = doc(db, "pages", pageSlug);
-  await updateDoc(pageDocRef, { title: title, bio: bio });
+  } catch (error) { console.error(error); }
 };
 
 export const generateVCardBlob = (pageData: PageData): Blob => {
@@ -164,19 +172,11 @@ END:VCARD`;
 
 export const findUserByEmail = async (email: string): Promise<(UserData & { uid: string }) | null> => {
   if (!email) return null;
-  try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", email.trim()));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) return null;
-    const userDoc = querySnapshot.docs[0];
-    return { uid: userDoc.id, ...(userDoc.data() as UserData) };
-  } catch (error) {
-    return null;
-  }
+  const q = query(collection(db, "users"), where("email", "==", email.trim()));
+  const snapshot = await getDocs(q);
+  return snapshot.empty ? null : { uid: snapshot.docs[0].id, ...(snapshot.docs[0].data() as UserData) };
 };
 
-export const updateUserPlan = async (targetUserId: string, newPlan: 'free' | 'pro'): Promise<void> => {
-    const userDocRef = doc(db, "users", targetUserId);
-    await updateDoc(userDocRef, { plan: newPlan });
+export const updateUserPlan = async (userId: string, newPlan: 'free' | 'pro'): Promise<void> => {
+  await updateDoc(doc(db, "users", userId), { plan: newPlan });
 };

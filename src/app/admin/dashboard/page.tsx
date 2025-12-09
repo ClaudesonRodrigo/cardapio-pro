@@ -10,28 +10,29 @@ import {
   updatePageTheme, updatePageBackground, updateProfileImage, updatePageProfileInfo,
   PageData, LinkData, UserData, findUserByEmail, updateUserPlan
 } from '@/lib/pageService';
-import { FaLock, FaSearch, FaCamera, FaUserCog, FaArrowLeft, FaImage, FaSave, FaQrcode, FaChartLine, FaUtensils, FaPlus, FaTrash } from 'react-icons/fa';
+import { 
+  FaUserCog, FaArrowLeft, FaImage, FaSave, FaQrcode, FaChartLine, 
+  FaUtensils, FaPlus, FaTrash, FaCamera, FaCopy, FaExternalLinkAlt, FaLock, FaMapMarkerAlt, FaExclamationCircle 
+} from 'react-icons/fa';
 import Image from 'next/image';
-
-import { 
-  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent 
-} from '@dnd-kit/core';
-import { 
-  arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy 
-} from '@dnd-kit/sortable';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableLinkItem } from '@/components/SortableLinkItem';
 import { QRCodeCanvas } from 'qrcode.react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const CLOUDINARY_CLOUD_NAME = "dhzzvc3vl"; 
 const CLOUDINARY_UPLOAD_PRESET = "links-page-pro"; 
 
 const themes = [
-  { name: 'restaurant', label: 'Restaurante Clássico', colorClass: 'bg-red-900', isPro: false }, // Liberei para teste
+  { name: 'restaurant', label: 'Bistrô (Vinho)', colorClass: 'bg-red-900', isPro: false },
   { name: 'light', label: 'Clean (Branco)', colorClass: 'bg-gray-100', isPro: false },
-  { name: 'dark', label: 'Moderno (Escuro)', colorClass: 'bg-gray-900', isPro: false },
-  { name: 'mechanic', label: 'Industrial', colorClass: 'bg-slate-800 border-l-4 border-cyan-500', isPro: true },
-  { name: 'realtor', label: 'Luxo (Dourado)', colorClass: 'bg-neutral-900 border border-yellow-600', isPro: true },
+  { name: 'dark', label: 'Pub (Escuro)', colorClass: 'bg-gray-900', isPro: false },
+  { name: 'pizza', label: 'Pizzaria', colorClass: 'bg-orange-600', isPro: true },
+  { name: 'sushi', label: 'Sushi', colorClass: 'bg-black border-b-4 border-red-600', isPro: true },
+  { name: 'cafe', label: 'Cafeteria', colorClass: 'bg-amber-800', isPro: true },
+  { name: 'burger', label: 'Hamburgueria', colorClass: 'bg-yellow-500', isPro: true },
+  { name: 'ocean', label: 'Praia (Azul)', colorClass: 'bg-blue-500', isPro: true },
 ];
 
 export default function DashboardPage() {
@@ -42,26 +43,28 @@ export default function DashboardPage() {
   const [pageSlug, setPageSlug] = useState<string | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // Estados de Prato/Item
+  // Campos do Prato
   const [newItemTitle, setNewItemTitle] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
   const [newItemDesc, setNewItemDesc] = useState('');
+  const [newItemCat, setNewItemCat] = useState('');
   const [newItemImage, setNewItemImage] = useState('');
   const [isUploadingItemImg, setIsUploadingItemImg] = useState(false);
 
-  // Edição
+  // Campos de Edição
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editItemTitle, setEditItemTitle] = useState('');
   const [editItemPrice, setEditItemPrice] = useState('');
   const [editItemDesc, setEditItemDesc] = useState('');
+  const [editItemCat, setEditItemCat] = useState('');
   const [editItemImage, setEditItemImage] = useState('');
 
-  // Perfil
+  // Perfil e UI
   const [editingProfileTitle, setEditingProfileTitle] = useState('');
   const [editingProfileBio, setEditingProfileBio] = useState('');
+  const [editingProfileAddress, setEditingProfileAddress] = useState('');
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isUploadingBg, setIsUploadingBg] = useState(false);
-  
   const [showQRCode, setShowQRCode] = useState(false);
   const [copyButtonText, setCopyButtonText] = useState('Copiar Link');
 
@@ -72,11 +75,8 @@ export default function DashboardPage() {
   const [searchEmail, setSearchEmail] = useState('');
   const [foundUser, setFoundUser] = useState<(UserData & { uid: string }) | null>(null);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
-  
-  // --- AQUI ESTAVA O ERRO: Adicionando os estados que faltavam ---
   const [isSearching, setIsSearching] = useState(false);
   const [isUpdatingPlan, setIsUpdatingPlan] = useState(false);
-  // -------------------------------------------------------------
 
   const isProPlan = targetUserId ? true : (userData?.plan === 'pro');
 
@@ -85,19 +85,16 @@ export default function DashboardPage() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  const existingCategories = Array.from(new Set(pageData?.links?.map(l => l.category).filter(Boolean) || []));
+
   const uploadToCloudinary = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
     formData.append('cloud_name', CLOUDINARY_CLOUD_NAME);
-    try {
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-        method: 'POST', body: formData,
-      });
-      if (!response.ok) throw new Error('Falha no upload');
-      const data = await response.json();
-      return data.secure_url;
-    } catch (error) { throw error; }
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: formData });
+    const data = await res.json();
+    return data.secure_url;
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -105,12 +102,12 @@ export default function DashboardPage() {
     if (over && active.id !== over.id && pageData?.links) {
       setPageData((prev) => {
         if (!prev) return null;
-        const oldIndex = prev.links.findIndex((link, idx) => (link.url || link.title) + idx === active.id);
-        const newIndex = prev.links.findIndex((link, idx) => (link.url || link.title) + idx === over.id);
+        const oldIndex = prev.links.findIndex((l, i) => (l.url || l.title) + i === active.id);
+        const newIndex = prev.links.findIndex((l, i) => (l.url || l.title) + i === over.id);
         const newLinks = arrayMove(prev.links, oldIndex, newIndex);
-        const reorderedLinks = newLinks.map((link, index) => ({ ...link, order: index + 1 }));
-        if (pageSlug) updateLinksOnPage(pageSlug, reorderedLinks);
-        return { ...prev, links: reorderedLinks };
+        const reordered = newLinks.map((l, i) => ({ ...l, order: i + 1 }));
+        if (pageSlug) updateLinksOnPage(pageSlug, reordered);
+        return { ...prev, links: reordered };
       });
     }
   };
@@ -127,11 +124,8 @@ export default function DashboardPage() {
         setPageSlug(result.slug);
         setEditingProfileTitle(data.title || '');
         setEditingProfileBio(data.bio || '');
-      } else {
-        setPageData(null);
+        setEditingProfileAddress(data.address || '');
       }
-      setIsLoadingData(false);
-    } else {
       setIsLoadingData(false);
     }
   }, [user, targetUserId]);
@@ -139,112 +133,89 @@ export default function DashboardPage() {
   useEffect(() => { if (!loading && user) fetchPageData(); }, [user, loading, fetchPageData]);
   useEffect(() => { if (!loading && !user) router.push('/admin/login'); }, [user, loading, router]);
 
-  const handleLogout = () => signOutUser();
-  const handleManageUser = (uid: string, email: string | undefined) => {
-    setTargetUserId(uid);
-    setTargetUserEmail(email || 'Cliente');
-    setAdminMessage(null); setFoundUser(null); setSearchEmail('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  const handleExitAdminMode = () => { setTargetUserId(null); setTargetUserEmail(null); };
-
   const handleAddItem = async (e: FormEvent) => {
     e.preventDefault();
-    if (!pageSlug || !newItemTitle) { alert("O nome do prato é obrigatório."); return; }
-    
-    const currentLinks = pageData?.links || [];
-    const newOrder = currentLinks.length > 0 ? Math.max(...currentLinks.map(l => l.order)) + 1 : 1;
+    if (!pageSlug || !newItemTitle) return;
+
+    // --- TRAVA DO PLANO FREE: LIMITE DE 8 ITENS ---
+    const current = pageData?.links || [];
+    if (!isProPlan && current.length >= 8) {
+        alert("⚠️ Limite do Plano Grátis Atingido (8 itens).\n\nFaça upgrade para o Plano Profissional para adicionar itens ilimitados!");
+        return;
+    }
+    // ----------------------------------------------
 
     const newItem: LinkData = {
       title: newItemTitle,
-      url: '', // URL vazia se for só item de menu
-      type: "dish",
-      order: newOrder,
+      url: '', 
+      type: 'dish',
+      order: current.length + 1,
       clicks: 0,
       price: newItemPrice,
       description: newItemDesc,
-      imageUrl: newItemImage
+      imageUrl: newItemImage,
+      category: newItemCat
     };
-
-    try {
-      await addLinkToPage(pageSlug, newItem);
-      setNewItemTitle(''); setNewItemPrice(''); setNewItemDesc(''); setNewItemImage('');
-      await fetchPageData();
-    } catch (error) { alert("Erro ao adicionar prato."); }
+    await addLinkToPage(pageSlug, newItem);
+    setNewItemTitle(''); setNewItemPrice(''); setNewItemDesc(''); setNewItemImage(''); setNewItemCat('');
+    fetchPageData();
   };
 
   const handleUpdateItem = async (index: number) => {
-    if (!pageSlug || !pageData || !pageData.links) return;
-    const updatedLinks = [...pageData.links];
-    updatedLinks[index] = {
-      ...updatedLinks[index],
-      title: editItemTitle,
-      price: editItemPrice,
-      description: editItemDesc,
-      imageUrl: editItemImage
+    if (!pageSlug || !pageData) return;
+    const updated = [...pageData.links];
+    updated[index] = { 
+        ...updated[index], 
+        title: editItemTitle, 
+        price: editItemPrice, 
+        description: editItemDesc, 
+        imageUrl: editItemImage,
+        category: editItemCat
     };
-    try {
-      await updateLinksOnPage(pageSlug, updatedLinks);
-      setEditingIndex(null);
-      await fetchPageData();
-    } catch (error) { alert("Erro ao atualizar."); }
-  };
-
-  const handleDeleteLink = async (link: LinkData) => {
-    if (!window.confirm("Excluir este item?")) return;
-    if (!pageSlug) return;
-    try { await deleteLinkFromPage(pageSlug, link); await fetchPageData(); } catch { alert("Erro ao excluir."); }
-  };
-
-  const handleEditClick = (link: LinkData, index: number) => {
-    setEditingIndex(index);
-    setEditItemTitle(link.title);
-    setEditItemPrice(link.price || '');
-    setEditItemDesc(link.description || '');
-    setEditItemImage(link.imageUrl || '');
+    await updateLinksOnPage(pageSlug, updated);
+    setEditingIndex(null);
+    fetchPageData();
   };
 
   const handleItemImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isNew: boolean) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const file = e.target.files?.[0]; if (!file) return;
     setIsUploadingItemImg(true);
     try {
-      const url = await uploadToCloudinary(file);
-      if (isNew) setNewItemImage(url); else setEditItemImage(url);
-    } catch { alert("Erro no upload da imagem do prato."); } 
-    finally { setIsUploadingItemImg(false); }
+        const url = await uploadToCloudinary(file);
+        if (isNew) setNewItemImage(url); else setEditItemImage(url);
+    } catch (e) { alert("Erro upload imagem"); }
+    setIsUploadingItemImg(false);
   };
 
-  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !pageSlug) return;
-    setIsUploadingProfile(true);
-    try {
+  const handleProfileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]; if (!file || !pageSlug) return;
+      setIsUploadingProfile(true);
       const url = await uploadToCloudinary(file);
       await updateProfileImage(pageSlug, url);
-      setPageData(prev => prev ? { ...prev, profileImageUrl: url } : null);
-    } catch { alert("Erro no upload."); } finally { setIsUploadingProfile(false); }
+      setPageData(prev => prev ? {...prev, profileImageUrl: url} : null);
+      setIsUploadingProfile(false);
   };
-
-  const handleBackgroundImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !pageSlug) return;
-    if (!isProPlan) { alert("Fundo personalizado é Pro!"); return; }
-    setIsUploadingBg(true);
-    try {
+  
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]; if (!file || !pageSlug) return;
+      if(!isProPlan) { alert("Recurso Pro!"); return; }
+      setIsUploadingBg(true);
       const url = await uploadToCloudinary(file);
       await updatePageBackground(pageSlug, url);
-      setPageData(prev => prev ? { ...prev, backgroundImage: url } : null);
-    } catch { alert("Erro no upload."); } finally { setIsUploadingBg(false); }
+      setPageData(prev => prev ? {...prev, backgroundImage: url} : null);
+      setIsUploadingBg(false);
   };
 
-  const handleSaveProfileInfo = async () => {
-      if (!pageSlug) return;
-      try {
-          await updatePageProfileInfo(pageSlug, editingProfileTitle, editingProfileBio);
-          setPageData(prev => prev ? { ...prev, title: editingProfileTitle, bio: editingProfileBio } : null);
-          alert("Perfil salvo!");
-      } catch { alert("Erro ao salvar."); }
+  const handleSaveProfile = async () => {
+      if(!pageSlug) return;
+      // Trava de segurança: Se for free, não deixa salvar endereço
+      if (!isProPlan && editingProfileAddress && editingProfileAddress !== pageData?.address) {
+          alert("Endereço é um recurso do Plano Pro.");
+          return;
+      }
+      await updatePageProfileInfo(pageSlug, editingProfileTitle, editingProfileBio, isProPlan ? editingProfileAddress : '');
+      setPageData(prev => prev ? {...prev, title: editingProfileTitle, bio: editingProfileBio, address: isProPlan ? editingProfileAddress : ''} : null);
+      alert("Salvo!");
   };
 
   const handleCopyUrl = () => {
@@ -277,229 +248,223 @@ export default function DashboardPage() {
       finally { setIsUpdatingPlan(false); }
   };
 
-  if (loading || (!isAdmin && isLoadingData)) return <div className="flex items-center justify-center min-h-screen bg-gray-100">Carregando...</div>;
-  if (!user) return null;
+  const handleManageUser = (uid: string, email: string | undefined) => {
+    setTargetUserId(uid);
+    setTargetUserEmail(email || 'Cliente');
+    setAdminMessage(null); setFoundUser(null); setSearchEmail('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const handleExitAdminMode = () => { setTargetUserId(null); setTargetUserEmail(null); };
+  const signOut = signOutUser;
+
+  if (loading || (!isAdmin && isLoadingData)) return <div className="flex items-center justify-center min-h-screen">Carregando...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {targetUserId && (
-        <div className="bg-red-600 text-white px-4 py-3 sticky top-0 z-50 flex justify-between items-center shadow-md">
-            <span className="font-bold flex items-center gap-2"><FaUserCog/> Editando: {targetUserEmail}</span>
-            <button onClick={handleExitAdminMode} className="bg-white text-red-600 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1"><FaArrowLeft/> Sair</button>
-        </div>
-      )}
-
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 h-16 flex justify-between items-center">
-            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FaUtensils className="text-orange-500"/> Gestor de Cardápio</h1>
-            <button onClick={handleLogout} className="text-red-600 font-medium text-sm hover:text-red-800">Sair</button>
-        </div>
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+      <nav className="bg-white shadow-sm sticky top-0 z-20">
+         <div className="max-w-4xl mx-auto px-4 h-16 flex justify-between items-center">
+            <h1 className="font-bold text-gray-800 flex gap-2 items-center"><FaUtensils className="text-orange-500"/> Gestor de Cardápio</h1>
+            <button onClick={() => signOut()} className="text-red-500 text-sm font-medium">Sair</button>
+         </div>
       </nav>
 
       <main className="max-w-4xl mx-auto py-8 px-4 space-y-6">
         
-        {/* CABEÇALHO DO RESTAURANTE */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-6">
-            <div className="relative group shrink-0">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-orange-100 shadow-inner bg-gray-100 relative">
-                    {pageData?.profileImageUrl ? (
-                        <Image src={pageData.profileImageUrl} alt="Logo" fill className="object-cover" />
-                    ) : (
-                        <FaCamera className="text-gray-300 w-8 h-8 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                    )}
+        {/* CABEÇALHO */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-center">
+            <div className="relative w-24 h-24 shrink-0">
+                <div className="w-full h-full rounded-full overflow-hidden border-4 border-orange-100 relative bg-gray-100">
+                    {pageData?.profileImageUrl ? <Image src={pageData.profileImageUrl} alt="Logo" fill className="object-cover" sizes="96px" /> : <FaCamera className="text-gray-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8"/>}
                 </div>
-                <label className="absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full cursor-pointer hover:bg-orange-600 shadow-md">
-                    <FaCamera size={12} />
-                    <input type="file" className="hidden" accept="image/*" onChange={handleProfileImageUpload} disabled={isUploadingProfile} />
-                </label>
-                {isUploadingProfile && <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center"><div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full"/></div>}
+                <label className="absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full cursor-pointer hover:bg-orange-600 shadow"><FaCamera size={12}/><input type="file" className="hidden" onChange={handleProfileUpload} disabled={isUploadingProfile}/></label>
             </div>
-            
             <div className="flex-1 w-full space-y-3">
-                <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Nome do Restaurante</label>
-                    <input type="text" value={editingProfileTitle} onChange={(e) => setEditingProfileTitle(e.target.value)} className="w-full border-b border-gray-300 focus:border-orange-500 outline-none py-1 text-lg font-semibold bg-transparent" placeholder="Ex: Pizzaria do João" />
+                <input type="text" value={editingProfileTitle} onChange={e => setEditingProfileTitle(e.target.value)} className="w-full text-lg font-bold border-b border-gray-300 focus:border-orange-500 outline-none" placeholder="Nome do Restaurante" />
+                <textarea value={editingProfileBio} onChange={e => setEditingProfileBio(e.target.value)} className="w-full text-sm border rounded p-2 focus:border-orange-500 outline-none resize-none" rows={2} placeholder="Descrição / Horário de Funcionamento" />
+                
+                {/* CAMPO DE ENDEREÇO COM CADEADO */}
+                <div className={`flex items-center gap-2 border rounded p-2 ${isProPlan ? 'bg-gray-50' : 'bg-gray-100 opacity-60 cursor-not-allowed'}`}>
+                    <FaMapMarkerAlt className="text-gray-400" />
+                    <input 
+                        type="text" 
+                        value={editingProfileAddress} 
+                        onChange={e => setEditingProfileAddress(e.target.value)} 
+                        className={`w-full text-sm bg-transparent outline-none ${!isProPlan ? 'cursor-not-allowed' : ''}`}
+                        placeholder={isProPlan ? "Endereço Completo" : "Endereço (Recurso Pro)"} 
+                        disabled={!isProPlan}
+                    />
+                    {!isProPlan && <FaLock className="text-gray-400" />}
                 </div>
-                <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Descrição / Horário</label>
-                    <textarea value={editingProfileBio} onChange={(e) => setEditingProfileBio(e.target.value)} rows={2} className="w-full border rounded-md border-gray-300 focus:border-orange-500 outline-none p-2 text-sm bg-transparent resize-none" placeholder="Ex: A melhor pizza da cidade. Aberto das 18h às 23h." />
-                </div>
-                <button onClick={handleSaveProfileInfo} className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-orange-700 transition self-start"><FaSave/> Salvar Dados</button>
+
+                <button onClick={handleSaveProfile} className="bg-orange-600 text-white px-4 py-2 rounded text-sm font-bold flex gap-2 hover:bg-orange-700 transition w-fit"><FaSave/> Salvar Dados</button>
             </div>
         </div>
 
-        {/* QR CODE E LINK */}
+        {/* ÁREA DE DIVULGAÇÃO */}
         {pageSlug && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4 items-center justify-between bg-gradient-to-r from-orange-50 to-white">
-                <div className="flex-1">
-                    <h3 className="font-bold text-gray-800">Seu Cardápio Digital</h3>
-                    <p className="text-sm text-gray-500 mb-2">Compartilhe ou imprima o QR Code para as mesas.</p>
-                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 max-w-md">
-                        <span className="text-xs text-gray-500 truncate flex-1">{window.location.origin}/{pageSlug}</span>
-                        <button onClick={handleCopyUrl} className="text-xs font-bold text-orange-600 hover:text-orange-800 px-2">{copyButtonText}</button>
-                    </div>
-                </div>
-                <button onClick={() => setShowQRCode(!showQRCode)} className="bg-gray-800 text-white px-4 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-gray-900 shadow-lg">
-                    <FaQrcode /> {showQRCode ? 'Ocultar QR' : 'Ver QR Code'}
-                </button>
-            </div>
-        )}
-
-        {showQRCode && pageSlug && (
-            <div className="flex justify-center bg-white p-8 rounded-xl shadow-lg border border-gray-100 animate-in fade-in zoom-in duration-300">
-                <div className="text-center">
-                    <div className="bg-white p-4 rounded-xl border-2 border-gray-100 inline-block mb-4">
-                         <QRCodeCanvas value={`${window.location.origin}/${pageSlug}`} size={200} level="H" />
-                    </div>
-                    <p className="text-sm font-bold text-gray-800">Aponte a câmera do celular</p>
-                </div>
-            </div>
-        )}
-
-        {/* ADICIONAR NOVO PRATO */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaPlus className="text-green-500"/> Novo Item do Cardápio</h3>
-            <form onSubmit={handleAddItem} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4">
-                    {/* Upload de Imagem do Prato */}
-                    <div className="w-24 h-24 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center relative cursor-pointer hover:bg-gray-50 transition shrink-0 group">
-                        {newItemImage ? (
-                            <Image src={newItemImage} alt="Prato" fill className="object-cover rounded-lg" />
-                        ) : (
-                            <div className="text-center text-gray-400">
-                                <FaCamera className="mx-auto mb-1"/>
-                                <span className="text-[10px]">FOTO</span>
-                            </div>
-                        )}
-                        <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleItemImageUpload(e, true)} disabled={isUploadingItemImg} />
-                        {isUploadingItemImg && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><div className="animate-spin w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full"/></div>}
-                        {newItemImage && <button type="button" onClick={(e) => {e.preventDefault(); setNewItemImage('')}} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"><FaTrash size={10}/></button>}
-                    </div>
-
-                    <div className="space-y-3 flex-1">
-                        <div className="flex gap-3">
-                            <input type="text" placeholder="Nome do Prato (Ex: X-Bacon)" value={newItemTitle} onChange={(e) => setNewItemTitle(e.target.value)} className="flex-1 border rounded-lg p-2 text-sm focus:border-orange-500 outline-none" required />
-                            <input type="text" placeholder="Preço (R$)" value={newItemPrice} onChange={(e) => setNewItemPrice(e.target.value)} className="w-24 border rounded-lg p-2 text-sm focus:border-orange-500 outline-none" />
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><FaQrcode className="text-orange-500" /> Divulgação</h3>
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 bg-orange-50 border border-orange-200 p-4 rounded-xl flex flex-col justify-center">
+                        <label className="text-orange-800 text-xs font-bold uppercase mb-2">Link do Cardápio</label>
+                        <div className="flex gap-2">
+                            <div className="flex-1 bg-white border border-orange-200 rounded px-3 py-2 text-sm text-gray-600 truncate flex items-center">{typeof window !== 'undefined' ? window.location.origin : ''}/{pageSlug}</div>
+                            <button onClick={handleCopyUrl} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded font-bold text-sm transition flex items-center gap-2"><FaCopy /> {copyButtonText}</button>
                         </div>
-                        <textarea placeholder="Descrição (Ingredientes, detalhes...)" value={newItemDesc} onChange={(e) => setNewItemDesc(e.target.value)} rows={2} className="w-full border rounded-lg p-2 text-sm focus:border-orange-500 outline-none resize-none" />
+                    </div>
+                    <div className="flex gap-2">
+                        {/* BOTÃO QR CODE COM CADEADO SE FOR FREE */}
+                        <button 
+                            onClick={() => isProPlan ? setShowQRCode(!showQRCode) : alert("QR Code é um recurso do plano Profissional.")} 
+                            className={`${isProPlan ? 'bg-gray-800 hover:bg-gray-900' : 'bg-gray-400 cursor-not-allowed'} text-white px-4 rounded-xl font-bold flex flex-col items-center justify-center gap-1 min-w-[100px] transition py-3 relative`}
+                        >
+                            <FaQrcode size={20} />
+                            <span className="text-xs">{showQRCode ? 'Fechar' : 'QR Code'}</span>
+                            {!isProPlan && <div className="absolute top-2 right-2"><FaLock size={10} /></div>}
+                        </button>
+                        
+                        <a href={`/${pageSlug}`} target="_blank" className="bg-white border-2 border-gray-200 hover:border-gray-400 text-gray-700 px-4 rounded-xl font-bold flex flex-col items-center justify-center gap-1 min-w-[100px] transition py-3">
+                            <FaExternalLinkAlt size={18} /><span className="text-xs">Abrir</span>
+                        </a>
                     </div>
                 </div>
-                <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition shadow-md flex justify-center items-center gap-2">Adicionar ao Cardápio</button>
+                {showQRCode && isProPlan && (
+                    <div className="mt-6 flex justify-center bg-gray-50 p-8 rounded-xl border border-dashed border-gray-300 animate-in fade-in zoom-in">
+                        <div className="text-center">
+                            <div className="bg-white p-4 rounded-xl border-2 border-gray-100 inline-block mb-4 shadow-sm">
+                                <QRCodeCanvas value={`${typeof window !== 'undefined' ? window.location.origin : ''}/${pageSlug}`} size={200} level="H" />
+                            </div>
+                            <p className="text-sm font-bold text-gray-800">Aponte a câmera do celular</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* ADICIONAR PRATO */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <h3 className="font-bold text-gray-800 mb-4 flex gap-2 items-center">
+                <FaPlus className="text-green-500"/> Novo Prato
+                {!isProPlan && <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-auto">Free: {(pageData?.links?.length || 0)}/8</span>}
+            </h3>
+            <form onSubmit={handleAddItem} className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                    <div className="w-20 h-20 bg-gray-50 rounded border-2 border-dashed border-gray-300 flex items-center justify-center relative cursor-pointer hover:bg-gray-100 group shrink-0">
+                        {newItemImage ? <Image src={newItemImage} alt="Prato" fill className="object-cover rounded" sizes="80px" /> : <FaCamera className="text-gray-400"/>}
+                        <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleItemImageUpload(e, true)} disabled={isUploadingItemImg} />
+                        {isUploadingItemImg && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><div className="animate-spin w-4 h-4 border-2 border-orange-500 rounded-full border-t-transparent"/></div>}
+                    </div>
+                    <div className="flex-1 space-y-3 w-full">
+                        <div className="flex gap-3">
+                            <input className="flex-1 border p-2 rounded text-sm outline-none focus:border-orange-500" placeholder="Nome do Prato" value={newItemTitle} onChange={e => setNewItemTitle(e.target.value)} required />
+                            <input className="w-24 border p-2 rounded text-sm outline-none focus:border-orange-500" placeholder="R$" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} />
+                        </div>
+                        <input className="w-full border p-2 rounded text-sm outline-none focus:border-orange-500" placeholder="Categoria (Ex: Bebidas, Lanches)" value={newItemCat} onChange={e => setNewItemCat(e.target.value)} list="categories-list" />
+                        <datalist id="categories-list">{existingCategories.map((cat, i) => <option key={i} value={cat as string} />)}</datalist>
+                        <input className="w-full border p-2 rounded text-sm outline-none focus:border-orange-500" placeholder="Descrição" value={newItemDesc} onChange={e => setNewItemDesc(e.target.value)} />
+                    </div>
+                </div>
+                <button type="submit" className="w-full bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700 transition">Adicionar ao Cardápio</button>
             </form>
         </div>
 
-        {/* LISTA DE ITENS (CARDÁPIO) */}
+        {/* LISTA */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Itens do Cardápio (Arraste para organizar)</h3>
-            
-            {pageData?.links && pageData.links.length > 0 ? (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={pageData.links.map((l, idx) => (l.url || l.title) + idx)} strategy={verticalListSortingStrategy}>
-                        <div className="space-y-3">
-                            {pageData.links.map((link, index) => {
-                                if (editingIndex === index) {
-                                    // FORMULÁRIO DE EDIÇÃO
-                                    return (
-                                        <div key={(link.url || link.title) + index} className="bg-orange-50 border border-orange-200 p-4 rounded-xl space-y-4">
-                                            <h4 className="text-sm font-bold text-orange-800">Editando Item</h4>
-                                            <div className="flex gap-4">
-                                                <div className="w-20 h-20 bg-white rounded border border-orange-200 relative shrink-0">
-                                                    {editItemImage ? <Image src={editItemImage} alt="Prato" fill className="object-cover rounded" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><FaImage/></div>}
-                                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleItemImageUpload(e, false)} />
-                                                </div>
-                                                <div className="flex-1 space-y-2">
-                                                    <div className="flex gap-2">
-                                                        <input type="text" value={editItemTitle} onChange={(e) => setEditItemTitle(e.target.value)} className="flex-1 border p-2 rounded text-sm" placeholder="Nome" />
-                                                        <input type="text" value={editItemPrice} onChange={(e) => setEditItemPrice(e.target.value)} className="w-20 border p-2 rounded text-sm" placeholder="Preço" />
-                                                    </div>
-                                                    <textarea value={editItemDesc} onChange={(e) => setEditItemDesc(e.target.value)} className="w-full border p-2 rounded text-sm" rows={2} placeholder="Descrição" />
-                                                </div>
+            <h3 className="font-bold text-gray-800 mb-4">Cardápio Atual</h3>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={pageData?.links?.map((l,i) => (l.url||l.title)+i) || []} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-3">
+                        {pageData?.links?.map((link, index) => {
+                            if (editingIndex === index) {
+                                return (
+                                    <div key={(link.url||link.title)+index} className="bg-orange-50 p-4 rounded border border-orange-200 space-y-3">
+                                        <p className="text-xs font-bold text-orange-800 uppercase">Editando: {link.title}</p>
+                                        <div className="flex gap-3">
+                                            <div className="w-16 h-16 bg-white rounded relative border border-gray-200 shrink-0">
+                                                {editItemImage ? <Image src={editItemImage} alt="Img" fill className="object-cover rounded" sizes="64px"/> : <div className="w-full h-full flex items-center justify-center text-gray-300"><FaImage/></div>}
+                                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleItemImageUpload(e, false)} />
                                             </div>
-                                            <div className="flex justify-end gap-2">
-                                                <button onClick={() => setEditingIndex(null)} className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg">Cancelar</button>
-                                                <button onClick={() => handleUpdateItem(index)} className="px-4 py-2 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700">Salvar Alterações</button>
+                                            <div className="flex-1 space-y-2">
+                                                <div className="flex gap-2">
+                                                    <input className="flex-1 border p-1 rounded text-sm" value={editItemTitle} onChange={e => setEditItemTitle(e.target.value)} placeholder="Nome" />
+                                                    <input className="w-20 border p-1 rounded text-sm" value={editItemPrice} onChange={e => setEditItemPrice(e.target.value)} placeholder="Preço" />
+                                                </div>
+                                                <input className="w-full border p-1 rounded text-sm" value={editItemCat} onChange={e => setEditItemCat(e.target.value)} placeholder="Categoria" list="categories-list" />
+                                                <input className="w-full border p-1 rounded text-sm" value={editItemDesc} onChange={e => setEditItemDesc(e.target.value)} placeholder="Descrição" />
                                             </div>
                                         </div>
-                                    );
-                                }
-                                return (
-                                    <SortableLinkItem 
-                                        key={(link.url || link.title) + index} 
-                                        link={link} 
-                                        index={index} 
-                                        onEdit={() => handleEditClick(link, index)} 
-                                        onDelete={() => handleDeleteLink(link)} 
-                                        editingIndex={editingIndex} 
-                                    />
+                                        <div className="flex justify-end gap-2">
+                                            <button onClick={() => setEditingIndex(null)} className="px-3 py-1 text-xs bg-white border rounded">Cancelar</button>
+                                            <button onClick={() => handleUpdateItem(index)} className="px-3 py-1 text-xs bg-green-600 text-white rounded">Salvar</button>
+                                        </div>
+                                    </div>
                                 );
-                            })}
-                        </div>
-                    </SortableContext>
-                </DndContext>
-            ) : (
-                <div className="text-center py-10 text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                    <FaUtensils size={30} className="mx-auto mb-2 opacity-50"/>
-                    <p>Seu cardápio está vazio.</p>
-                </div>
-            )}
+                            }
+                            return (
+                                <SortableLinkItem 
+                                    key={(link.url||link.title)+index} 
+                                    link={link} index={index} 
+                                    onEdit={() => { 
+                                        setEditingIndex(index); 
+                                        setEditItemTitle(link.title); 
+                                        setEditItemPrice(link.price||''); 
+                                        setEditItemDesc(link.description||''); 
+                                        setEditItemCat(link.category||'');
+                                        setEditItemImage(link.imageUrl||''); 
+                                    }} 
+                                    onDelete={async () => { if(confirm("Excluir?")) { await deleteLinkFromPage(pageSlug!, link); fetchPageData(); }}} 
+                                    editingIndex={editingIndex} 
+                                />
+                            );
+                        })}
+                    </div>
+                </SortableContext>
+            </DndContext>
         </div>
 
         {/* APARÊNCIA */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-             <h3 className="text-lg font-bold text-gray-800 mb-4">Personalização Visual</h3>
-             <div className="mb-6">
-                 <label className="block text-sm font-medium text-gray-600 mb-2">Imagem de Fundo (Capa do Cardápio)</label>
-                 <div className="flex gap-4 items-center">
-                    {pageData?.backgroundImage && <div className="w-16 h-10 relative rounded overflow-hidden border"><Image src={pageData.backgroundImage} alt="Bg" fill className="object-cover"/></div>}
-                    <input type="file" accept="image/*" onChange={handleBackgroundImageUpload} disabled={!isProPlan || isUploadingBg} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100" />
-                 </div>
-                 {!isProPlan && <p className="text-xs text-orange-500 mt-1 flex items-center gap-1"><FaLock/> Recurso Pro</p>}
+             <h3 className="font-bold text-gray-800 mb-4">Aparência</h3>
+             <div className="mb-4">
+                 <label className="text-sm text-gray-600 block mb-1">Capa de Fundo (Pro)</label>
+                 <input type="file" onChange={handleBgUpload} disabled={!isProPlan} className="text-sm text-gray-500" />
              </div>
-             
-             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {themes.map(t => (
-                    <button key={t.name} onClick={() => handleThemeChange(t.name)} disabled={t.isPro && !isProPlan} className={`p-2 border rounded-lg text-center transition ${pageData?.theme === t.name ? 'ring-2 ring-orange-500 border-orange-500' : 'hover:border-gray-400'} ${t.isPro && !isProPlan ? 'opacity-50' : ''}`}>
-                        <div className={`h-8 w-full rounded mb-1 ${t.colorClass}`}></div>
-                        <span className="text-xs font-medium">{t.label}</span>
-                    </button>
-                ))}
+             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {themes.map(t => {
+                    const locked = t.isPro && !isProPlan;
+                    return (
+                        <button key={t.name} onClick={() => { if(!locked) { updatePageTheme(pageSlug!, t.name); setPageData(prev => prev ? {...prev, theme: t.name} : null); }}} 
+                                className={`p-2 border rounded text-center text-xs relative overflow-hidden ${pageData?.theme === t.name ? 'border-orange-500 bg-orange-50' : ''} ${locked ? 'opacity-60 bg-gray-100' : ''}`}>
+                            <div className={`w-full h-6 rounded mb-1 ${t.colorClass}`}></div>
+                            {t.label}
+                            {locked && <div className="absolute inset-0 flex items-center justify-center bg-black/10"><FaLock className="text-white drop-shadow"/></div>}
+                        </button>
+                    )
+                })}
              </div>
         </div>
 
-        {/* ANALYTICS SIMPLES */}
-        {pageData?.links && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><FaChartLine className="text-blue-500"/> Itens Mais Populares</h3>
-                <div className="h-48 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={pageData.links.map(l => ({name: l.title, clicks: l.clicks || 0}))}>
-                            <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
-                            <Tooltip />
-                            <Bar dataKey="clicks" fill="#f97316" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-        )}
-
-        {/* ADMIN AREA */}
+        {/* ADMIN */}
         {isAdmin && (
-            <div className="bg-gray-100 p-6 rounded-xl border border-gray-200 mt-10">
-                <h3 className="font-bold text-gray-700 mb-4">Super Admin</h3>
+            <div className="bg-gray-800 text-white p-6 rounded-xl border border-gray-700 mt-10">
+                <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><FaUserCog/> Super Admin</h3>
                 <form onSubmit={handleSearchUser} className="flex gap-2 mb-4">
-                    <input type="email" value={searchEmail} onChange={e => setSearchEmail(e.target.value)} className="flex-1 p-2 rounded border" placeholder="Email do cliente" />
-                    <button className="bg-gray-800 text-white px-4 rounded">Buscar</button>
+                    <input type="email" value={searchEmail} onChange={e => setSearchEmail(e.target.value)} className="flex-1 p-2 rounded border border-gray-600 bg-gray-700 text-white outline-none" placeholder="Email do cliente" />
+                    <button className="bg-orange-600 text-white px-4 rounded font-bold hover:bg-orange-700">Buscar</button>
                 </form>
                 {foundUser && (
-                    <div className="bg-white p-4 rounded shadow">
+                    <div className="bg-gray-700 p-4 rounded shadow">
                         <p className="font-bold">{foundUser.email}</p>
-                        <p>Plano: {foundUser.plan}</p>
-                        <div className="flex gap-2 mt-2">
-                            <button onClick={() => handleChangePlan(foundUser.plan === 'free' ? 'pro' : 'free')} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm">Alternar Plano</button>
-                            <button onClick={() => handleManageUser(foundUser.uid, foundUser.email)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">Gerenciar Cardápio</button>
+                        <p className="text-sm text-gray-300 mb-2">Plano Atual: <span className={`font-bold ${foundUser.plan === 'pro' ? 'text-green-400' : 'text-gray-400'}`}>{foundUser.plan.toUpperCase()}</span></p>
+                        <div className="flex gap-2">
+                            <button onClick={() => handleChangePlan(foundUser.plan === 'free' ? 'pro' : 'free')} disabled={isUpdatingPlan} className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm font-bold">
+                                {foundUser.plan === 'free' ? 'Dar Pro' : 'Tirar Pro'}
+                            </button>
+                            <button onClick={() => handleManageUser(foundUser.uid, foundUser.email)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm font-bold">Acessar Conta</button>
                         </div>
                     </div>
                 )}
+                {adminMessage && <p className="text-sm mt-2 text-yellow-400">{adminMessage}</p>}
             </div>
         )}
       </main>
