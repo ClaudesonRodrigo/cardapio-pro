@@ -4,7 +4,7 @@ import { getPageDataBySlug, PageData } from '@/lib/pageService';
 
 export const runtime = 'edge';
 
-export const alt = 'Meus Links Pro - Perfil';
+export const alt = 'Cardápio Digital';
 export const size = {
   width: 1200,
   height: 630,
@@ -13,11 +13,13 @@ export const size = {
 export const contentType = 'image/png';
 
 export default async function Image({ params }: { params: { slug: string } }) {
-  const { slug } = await params; // Await params (Next.js 15 requirement)
+  // No Next.js 15, params é uma Promise e precisa de await
+  const { slug } = await params;
+  
   const pageData = await getPageDataBySlug(slug) as PageData | null;
 
-  const title = pageData?.title || 'Meus Links Pro';
-  const bio = pageData?.bio || 'Confira meus links!';
+  const title = pageData?.title || 'Cardápio Digital';
+  const bio = pageData?.bio || 'Faça seu pedido online!';
   const profileImage = pageData?.profileImageUrl;
 
   return new ImageResponse(
@@ -30,42 +32,97 @@ export default async function Image({ params }: { params: { slug: string } }) {
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'column',
-          backgroundImage: 'linear-gradient(to bottom right, #2563eb, #1e40af)',
+          // Fundo escuro elegante (padrão gourmet)
+          background: '#121212', 
           color: 'white',
           fontFamily: 'sans-serif',
           textAlign: 'center',
-          padding: '40px',
+          position: 'relative',
         }}
       >
-        {profileImage && (
+        {/* Elemento decorativo de fundo (mancha laranja) */}
+        <div style={{
+            position: 'absolute',
+            top: '-100px',
+            right: '-100px',
+            width: '600px',
+            height: '600px',
+            background: 'radial-gradient(circle, rgba(234, 88, 12, 0.2) 0%, rgba(0,0,0,0) 70%)',
+            borderRadius: '50%',
+        }}></div>
+
+        {profileImage ? (
+          // Se tiver logo, mostra ela redonda e destacada
           <img
             src={profileImage}
             alt={title}
-            width="150"
-            height="150"
+            width="200"
+            height="200"
             style={{
               borderRadius: '50%',
-              border: '6px solid white',
+              border: '8px solid #ea580c', // Borda laranja
               objectFit: 'cover',
-              marginBottom: '30px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
+              marginBottom: '40px',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.5)'
             }}
           />
+        ) : (
+          // Se não tiver logo, mostra um ícone de prato (círculo laranja)
+          <div style={{
+              width: '180px',
+              height: '180px',
+              borderRadius: '50%',
+              background: '#ea580c',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '40px',
+              fontSize: '80px',
+              color: 'white',
+              fontWeight: 'bold'
+          }}>
+             {title.charAt(0).toUpperCase()}
+          </div>
         )}
-        <div style={{ fontSize: 60, fontWeight: 'bold', marginBottom: '10px' }}>
+
+        <div style={{ 
+            fontSize: 70, 
+            fontWeight: 900, 
+            marginBottom: '10px',
+            background: 'linear-gradient(to right, #fff, #ccc)',
+            backgroundClip: 'text',
+            color: 'transparent',
+            maxWidth: '1000px',
+            padding: '0 20px',
+            lineHeight: 1.1
+        }}>
           {title}
         </div>
-        <div style={{ fontSize: 30, opacity: 0.9, maxWidth: '800px', lineHeight: 1.4 }}>
-          {bio.length > 100 ? bio.substring(0, 100) + '...' : bio}
-        </div>
+
         <div style={{ 
-            marginTop: '40px', 
-            background: 'rgba(255,255,255,0.2)', 
-            padding: '10px 30px', 
-            borderRadius: '50px',
-            fontSize: 20
+            fontSize: 32, 
+            color: '#a3a3a3', 
+            maxWidth: '900px', 
+            lineHeight: 1.4,
+            marginBottom: '40px'
         }}>
-            meuslinkspro.com/{slug}
+          {bio.length > 80 ? bio.substring(0, 80) + '...' : bio}
+        </div>
+
+        {/* Badge de Call to Action */}
+        <div style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#ea580c', 
+            padding: '15px 40px', 
+            borderRadius: '50px',
+            fontSize: 28,
+            fontWeight: 'bold',
+            color: 'white',
+            boxShadow: '0 4px 15px rgba(234, 88, 12, 0.4)'
+        }}>
+            Ver Cardápio Completo
         </div>
       </div>
     ),
