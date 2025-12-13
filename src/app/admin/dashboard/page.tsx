@@ -11,8 +11,8 @@ import {
   PageData, LinkData, UserData, findUserByEmail, updateUserPlan
 } from '@/lib/pageService';
 import { 
-  FaUserCog, FaArrowLeft, FaImage, FaSave, FaQrcode, FaChartLine, 
-  FaUtensils, FaPlus, FaTrash, FaCamera, FaCopy, FaExternalLinkAlt, FaLock, FaMapMarkerAlt, FaExclamationCircle 
+  FaUserCog, FaImage, FaSave, FaQrcode, FaChartLine, 
+  FaUtensils, FaPlus, FaCamera, FaCopy, FaExternalLinkAlt, FaLock, FaMapMarkerAlt, FaStore, FaDoorOpen, FaDoorClosed, FaWhatsapp
 } from 'react-icons/fa';
 import Image from 'next/image';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -63,6 +63,8 @@ export default function DashboardPage() {
   const [editingProfileTitle, setEditingProfileTitle] = useState('');
   const [editingProfileBio, setEditingProfileBio] = useState('');
   const [editingProfileAddress, setEditingProfileAddress] = useState('');
+  const [editingProfileWhatsapp, setEditingProfileWhatsapp] = useState('');
+  const [isOpenStore, setIsOpenStore] = useState(true);
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isUploadingBg, setIsUploadingBg] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
@@ -75,7 +77,6 @@ export default function DashboardPage() {
   const [searchEmail, setSearchEmail] = useState('');
   const [foundUser, setFoundUser] = useState<(UserData & { uid: string }) | null>(null);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
   const [isUpdatingPlan, setIsUpdatingPlan] = useState(false);
 
   const isProPlan = targetUserId ? true : (userData?.plan === 'pro');
@@ -125,6 +126,14 @@ export default function DashboardPage() {
         setEditingProfileTitle(data.title || '');
         setEditingProfileBio(data.bio || '');
         setEditingProfileAddress(data.address || '');
+        
+        let loadedWhats = (data as any).whatsapp || '';
+        if (loadedWhats.startsWith('55') && loadedWhats.length > 10) {
+            loadedWhats = loadedWhats.substring(2);
+        }
+        setEditingProfileWhatsapp(loadedWhats);
+        
+        setIsOpenStore(data.isOpen !== false);
       }
       setIsLoadingData(false);
     }
@@ -136,25 +145,14 @@ export default function DashboardPage() {
   const handleAddItem = async (e: FormEvent) => {
     e.preventDefault();
     if (!pageSlug || !newItemTitle) return;
-
-    // --- TRAVA DO PLANO FREE: LIMITE DE 8 ITENS ---
     const current = pageData?.links || [];
     if (!isProPlan && current.length >= 8) {
-        alert("⚠️ Limite do Plano Grátis Atingido (8 itens).\n\nFaça upgrade para o Plano Profissional para adicionar itens ilimitados!");
+        alert("⚠️ Limite do Plano Grátis Atingido (8 itens).\n\nFaça upgrade para o Plano Profissional!");
         return;
     }
-    // ----------------------------------------------
-
     const newItem: LinkData = {
-      title: newItemTitle,
-      url: '', 
-      type: 'dish',
-      order: current.length + 1,
-      clicks: 0,
-      price: newItemPrice,
-      description: newItemDesc,
-      imageUrl: newItemImage,
-      category: newItemCat
+      title: newItemTitle, url: '', type: 'dish', order: current.length + 1, clicks: 0,
+      price: newItemPrice, description: newItemDesc, imageUrl: newItemImage, category: newItemCat
     };
     await addLinkToPage(pageSlug, newItem);
     setNewItemTitle(''); setNewItemPrice(''); setNewItemDesc(''); setNewItemImage(''); setNewItemCat('');
@@ -164,14 +162,7 @@ export default function DashboardPage() {
   const handleUpdateItem = async (index: number) => {
     if (!pageSlug || !pageData) return;
     const updated = [...pageData.links];
-    updated[index] = { 
-        ...updated[index], 
-        title: editItemTitle, 
-        price: editItemPrice, 
-        description: editItemDesc, 
-        imageUrl: editItemImage,
-        category: editItemCat
-    };
+    updated[index] = { ...updated[index], title: editItemTitle, price: editItemPrice, description: editItemDesc, imageUrl: editItemImage, category: editItemCat };
     await updateLinksOnPage(pageSlug, updated);
     setEditingIndex(null);
     fetchPageData();
@@ -208,14 +199,24 @@ export default function DashboardPage() {
 
   const handleSaveProfile = async () => {
       if(!pageSlug) return;
-      // Trava de segurança: Se for free, não deixa salvar endereço
       if (!isProPlan && editingProfileAddress && editingProfileAddress !== pageData?.address) {
-          alert("Endereço é um recurso do Plano Pro.");
-          return;
+          alert("Endereço é um recurso do Plano Pro."); return;
       }
-      await updatePageProfileInfo(pageSlug, editingProfileTitle, editingProfileBio, isProPlan ? editingProfileAddress : '');
-      setPageData(prev => prev ? {...prev, title: editingProfileTitle, bio: editingProfileBio, address: isProPlan ? editingProfileAddress : ''} : null);
-      alert("Salvo!");
+      
+      const whatsappToSave = editingProfileWhatsapp ? `55${editingProfileWhatsapp.replace(/\D/g, '')}` : '';
+
+      await updatePageProfileInfo(pageSlug, editingProfileTitle, editingProfileBio, isProPlan ? editingProfileAddress : '', isOpenStore, whatsappToSave);
+      
+      setPageData(prev => prev ? {
+          ...prev, 
+          title: editingProfileTitle, 
+          bio: editingProfileBio, 
+          address: isProPlan ? editingProfileAddress : '', 
+          isOpen: isOpenStore, 
+          whatsapp: whatsappToSave
+      } : null);
+      
+      alert("Dados atualizados com sucesso!");
   };
 
   const handleCopyUrl = () => {
@@ -234,10 +235,9 @@ export default function DashboardPage() {
 
   const handleSearchUser = async (e: FormEvent) => {
       e.preventDefault(); if(!searchEmail) return;
-      setIsSearching(true); setAdminMessage(null); setFoundUser(null);
+      setAdminMessage(null); setFoundUser(null);
       const user = await findUserByEmail(searchEmail);
       if(user) setFoundUser(user); else setAdminMessage("Não encontrado.");
-      setIsSearching(false);
   };
 
   const handleChangePlan = async (newPlan: 'free' | 'pro') => {
@@ -249,8 +249,7 @@ export default function DashboardPage() {
   };
 
   const handleManageUser = (uid: string, email: string | undefined) => {
-    setTargetUserId(uid);
-    setTargetUserEmail(email || 'Cliente');
+    setTargetUserId(uid); setTargetUserEmail(email || 'Cliente');
     setAdminMessage(null); setFoundUser(null); setSearchEmail('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -270,19 +269,46 @@ export default function DashboardPage() {
 
       <main className="max-w-4xl mx-auto py-8 px-4 space-y-6">
         
-        {/* CABEÇALHO */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-center">
-            <div className="relative w-24 h-24 shrink-0">
-                <div className="w-full h-full rounded-full overflow-hidden border-4 border-orange-100 relative bg-gray-100">
-                    {pageData?.profileImageUrl ? <Image src={pageData.profileImageUrl} alt="Logo" fill className="object-cover" sizes="96px" /> : <FaCamera className="text-gray-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8"/>}
+        {/* CABEÇALHO / CONFIGURAÇÃO */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-start">
+            {/* FOTO E STATUS */}
+            <div className="flex flex-col items-center gap-3 shrink-0">
+                <div className="relative w-24 h-24">
+                    <div className="w-full h-full rounded-full overflow-hidden border-4 border-orange-100 relative bg-gray-100">
+                        {pageData?.profileImageUrl ? <Image src={pageData.profileImageUrl} alt="Logo" fill className="object-cover" sizes="96px" /> : <FaCamera className="text-gray-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8"/>}
+                    </div>
+                    <label className="absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full cursor-pointer hover:bg-orange-600 shadow"><FaCamera size={12}/><input type="file" className="hidden" onChange={handleProfileUpload} disabled={isUploadingProfile}/></label>
                 </div>
-                <label className="absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full cursor-pointer hover:bg-orange-600 shadow"><FaCamera size={12}/><input type="file" className="hidden" onChange={handleProfileUpload} disabled={isUploadingProfile}/></label>
+                
+                <button 
+                    onClick={() => setIsOpenStore(!isOpenStore)}
+                    className={`w-full py-1.5 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1 transition-colors ${isOpenStore ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}
+                >
+                    {isOpenStore ? <><FaDoorOpen/> Aberto</> : <><FaDoorClosed/> Fechado</>}
+                </button>
             </div>
+
+            {/* DADOS */}
             <div className="flex-1 w-full space-y-3">
                 <input type="text" value={editingProfileTitle} onChange={e => setEditingProfileTitle(e.target.value)} className="w-full text-lg font-bold border-b border-gray-300 focus:border-orange-500 outline-none" placeholder="Nome do Restaurante" />
                 <textarea value={editingProfileBio} onChange={e => setEditingProfileBio(e.target.value)} className="w-full text-sm border rounded p-2 focus:border-orange-500 outline-none resize-none" rows={2} placeholder="Descrição / Horário de Funcionamento" />
                 
-                {/* CAMPO DE ENDEREÇO COM CADEADO */}
+                {/* CAMPO DE WHATSAPP MELHORADO */}
+                <div className="flex items-center border rounded-lg overflow-hidden bg-white border-gray-300 focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-all">
+                    <div className="bg-gray-100 px-3 py-2 border-r border-gray-200 flex items-center gap-1 text-gray-500 font-bold text-sm shrink-0">
+                        <FaWhatsapp className="text-green-500" />
+                        +55
+                    </div>
+                    <input 
+                        type="tel" 
+                        value={editingProfileWhatsapp} 
+                        onChange={e => setEditingProfileWhatsapp(e.target.value.replace(/\D/g, ''))} // Só números
+                        className="w-full text-sm bg-transparent outline-none px-3 py-2" 
+                        placeholder="DDD + Número (Ex: 79999999999)" 
+                        maxLength={11}
+                    />
+                </div>
+
                 <div className={`flex items-center gap-2 border rounded p-2 ${isProPlan ? 'bg-gray-50' : 'bg-gray-100 opacity-60 cursor-not-allowed'}`}>
                     <FaMapMarkerAlt className="text-gray-400" />
                     <input 
@@ -313,16 +339,13 @@ export default function DashboardPage() {
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        {/* BOTÃO QR CODE COM CADEADO SE FOR FREE */}
                         <button 
                             onClick={() => isProPlan ? setShowQRCode(!showQRCode) : alert("QR Code é um recurso do plano Profissional.")} 
                             className={`${isProPlan ? 'bg-gray-800 hover:bg-gray-900' : 'bg-gray-400 cursor-not-allowed'} text-white px-4 rounded-xl font-bold flex flex-col items-center justify-center gap-1 min-w-[100px] transition py-3 relative`}
                         >
-                            <FaQrcode size={20} />
-                            <span className="text-xs">{showQRCode ? 'Fechar' : 'QR Code'}</span>
+                            <FaQrcode size={20} /> <span className="text-xs">{showQRCode ? 'Fechar' : 'QR Code'}</span>
                             {!isProPlan && <div className="absolute top-2 right-2"><FaLock size={10} /></div>}
                         </button>
-                        
                         <a href={`/${pageSlug}`} target="_blank" className="bg-white border-2 border-gray-200 hover:border-gray-400 text-gray-700 px-4 rounded-xl font-bold flex flex-col items-center justify-center gap-1 min-w-[100px] transition py-3">
                             <FaExternalLinkAlt size={18} /><span className="text-xs">Abrir</span>
                         </a>
@@ -422,22 +445,38 @@ export default function DashboardPage() {
             </DndContext>
         </div>
 
-        {/* APARÊNCIA */}
+        {/* APARÊNCIA RESTAURADA COM PREVIEW E LOCK */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-             <h3 className="font-bold text-gray-800 mb-4">Aparência</h3>
-             <div className="mb-4">
-                 <label className="text-sm text-gray-600 block mb-1">Capa de Fundo (Pro)</label>
-                 <input type="file" onChange={handleBgUpload} disabled={!isProPlan} className="text-sm text-gray-500" />
+             <h3 className="font-bold text-gray-800 mb-4">Aparência & Temas</h3>
+             <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                 <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                    <FaImage /> Imagem de Fundo (Capa)
+                    {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 rounded-full flex items-center gap-1"><FaLock size={10}/> Pro</span>}
+                 </label>
+                 <div className="flex items-center gap-4">
+                    {pageData?.backgroundImage ? (
+                        <div className="w-24 h-14 relative rounded-md overflow-hidden border border-gray-300 shadow-sm">
+                            <Image src={pageData.backgroundImage} alt="Bg" fill className="object-cover" sizes="96px" />
+                        </div>
+                    ) : (
+                        <div className="w-24 h-14 bg-gray-200 rounded-md border border-gray-300 flex items-center justify-center text-xs text-gray-400">Sem Capa</div>
+                    )}
+                    <label className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold transition ${isProPlan ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+                        {isProPlan ? (isUploadingBg ? 'Enviando...' : 'Alterar Capa') : 'Bloqueado'}
+                        <input type="file" onChange={handleBgUpload} disabled={!isProPlan} className="hidden" />
+                    </label>
+                 </div>
              </div>
-             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+             
+             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {themes.map(t => {
                     const locked = t.isPro && !isProPlan;
                     return (
                         <button key={t.name} onClick={() => { if(!locked) { updatePageTheme(pageSlug!, t.name); setPageData(prev => prev ? {...prev, theme: t.name} : null); }}} 
-                                className={`p-2 border rounded text-center text-xs relative overflow-hidden ${pageData?.theme === t.name ? 'border-orange-500 bg-orange-50' : ''} ${locked ? 'opacity-60 bg-gray-100' : ''}`}>
-                            <div className={`w-full h-6 rounded mb-1 ${t.colorClass}`}></div>
-                            {t.label}
-                            {locked && <div className="absolute inset-0 flex items-center justify-center bg-black/10"><FaLock className="text-white drop-shadow"/></div>}
+                                className={`p-3 border rounded-xl text-center transition relative overflow-hidden group ${pageData?.theme === t.name ? 'ring-2 ring-orange-500 border-orange-500 bg-orange-50' : 'hover:border-gray-400'} ${locked ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'bg-white'}`}>
+                            <div className={`h-10 w-full rounded-md mb-2 shadow-sm ${t.colorClass}`}></div>
+                            <span className="text-xs font-bold text-gray-700 block">{t.label}</span>
+                            {locked && <div className="absolute inset-0 bg-black/10 flex items-center justify-center"><FaLock className="text-white drop-shadow-md" /></div>}
                         </button>
                     )
                 })}

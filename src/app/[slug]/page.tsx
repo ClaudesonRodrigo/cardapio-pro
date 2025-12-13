@@ -5,21 +5,40 @@ import { useEffect, useState, use, useMemo } from 'react';
 import { getPageDataBySlug, PageData, LinkData } from "@/lib/pageService";
 import { notFound } from "next/navigation";
 import Image from 'next/image';
-import { FaMapMarkerAlt, FaWhatsapp, FaUtensils, FaPlus, FaMinus, FaShoppingCart, FaTrash } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaWhatsapp, FaUtensils, FaPlus, FaMinus, FaShoppingCart, FaTrash, FaStoreSlash } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExtendedPageData extends PageData {
   backgroundImage?: string;
-  plan?: string; // Incluído na tipagem para checar no front
+  plan?: string;
+  isOpen?: boolean;
+  whatsapp?: string; // Incluído
 }
 
-type CartItem = LinkData & {
-  quantity: number;
-};
+type CartItem = LinkData & { quantity: number; };
+
+function MenuSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-900 px-4 py-10 animate-pulse">
+        <div className="w-24 h-24 bg-gray-700 rounded-full mx-auto mb-4"/>
+        <div className="h-8 bg-gray-700 w-48 mx-auto mb-2 rounded"/>
+        <div className="h-4 bg-gray-700 w-64 mx-auto mb-8 rounded"/>
+        <div className="flex gap-2 mb-8 overflow-hidden">
+            {[1,2,3,4].map(i => <div key={i} className="h-8 w-20 bg-gray-700 rounded-full shrink-0"/>)}
+        </div>
+        <div className="space-y-4">
+            {[1,2,3].map(i => (
+                <div key={i} className="bg-gray-800 h-28 rounded-xl w-full"/>
+            ))}
+        </div>
+    </div>
+  );
+}
 
 export default function MenuPage({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = use(params);
   const [pageData, setPageData] = useState<ExtendedPageData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
@@ -27,7 +46,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   useEffect(() => {
     const fetchData = async () => {
       const data = await getPageDataBySlug(resolvedParams.slug) as ExtendedPageData | null;
-      if (!data) notFound();
+      if (!data) { notFound(); } 
       else {
         setPageData(data);
         document.documentElement.className = "";
@@ -38,6 +57,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
             document.documentElement.classList.add(`theme-${theme}`);
         }
       }
+      setLoading(false);
     };
     fetchData();
   }, [resolvedParams.slug]);
@@ -55,24 +75,18 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   }, [pageData, selectedCategory]);
 
   const addToCart = (item: LinkData) => {
+    if (pageData?.isOpen === false) { alert("O estabelecimento está fechado no momento."); return; }
     setCart(prev => {
       const existing = prev.find(i => i.title === item.title);
-      if (existing) {
-        return prev.map(i => i.title === item.title ? { ...i, quantity: i.quantity + 1 } : i);
-      }
+      if (existing) return prev.map(i => i.title === item.title ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, { ...item, quantity: 1 }];
     });
   };
 
-  const removeFromCart = (title: string) => {
-    setCart(prev => prev.filter(i => i.title !== title));
-  };
-
+  const removeFromCart = (title: string) => setCart(prev => prev.filter(i => i.title !== title));
   const updateQuantity = (title: string, delta: number) => {
     setCart(prev => prev.map(i => {
-      if (i.title === title) {
-        return { ...i, quantity: Math.max(1, i.quantity + delta) };
-      }
+      if (i.title === title) return { ...i, quantity: Math.max(1, i.quantity + delta) };
       return i;
     }));
   };
@@ -83,46 +97,47 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   }, 0);
 
   const handleCheckout = () => {
-    let phone = '5511999999999'; 
-    const whatsappLink = pageData?.links.find(l => l.url?.includes('wa.me') || l.url?.includes('api.whatsapp'));
-    if (whatsappLink && whatsappLink.url) {
-        const match = whatsappLink.url.match(/\d+/);
-        if(match) phone = match[0];
-    }
+    if (pageData?.isOpen === false) return;
+    
+    // --- AUTOMAÇÃO DO ZAP ---
+    let phone = pageData?.whatsapp || '5579996337995'; // Usa o número cadastrado ou o seu como fallback
+    
+    // Limpa o número (remove caracteres não numéricos)
+    phone = phone.replace(/\D/g, ''); 
 
     let message = `*Olá, gostaria de fazer um pedido:*\n\n`;
-    cart.forEach(item => {
-      message += `▪️ ${item.quantity}x ${item.title}\n`;
-    });
+    cart.forEach(item => { message += `▪️ ${item.quantity}x ${item.title}\n`; });
     message += `\n*Total: R$ ${cartTotal.toFixed(2).replace('.', ',')}*`;
-
+    
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const handleLocation = () => {
-      if(pageData?.address) {
-          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pageData.address)}`, '_blank');
-      } else {
-          alert("Endereço não cadastrado.");
-      }
+      if(pageData?.address) window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pageData.address)}`, '_blank');
   };
 
-  if (!pageData) return <div className="flex justify-center items-center min-h-screen bg-gray-900 text-white">Carregando...</div>;
+  if (loading || !pageData) return <MenuSkeleton />;
 
   const isPro = pageData.plan === 'pro';
+  const isClosed = pageData.isOpen === false;
 
   return (
     <div className="min-h-screen font-sans text-theme-text bg-theme-bg pb-32"
          style={pageData.backgroundImage ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.9)), url(${pageData.backgroundImage})`, backgroundSize: 'cover', backgroundAttachment: 'fixed' } : {}}
     >
-      <header className="pt-10 pb-6 px-4 text-center">
+      <header className="pt-10 pb-6 px-4 text-center relative">
         <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white/20 mx-auto bg-gray-800 mb-4 relative">
-            {pageData.profileImageUrl ? <Image src={pageData.profileImageUrl} alt="Logo" fill className="object-cover" sizes="96px" /> : <div className="flex items-center justify-center h-full text-white/30 text-3xl"><FaUtensils/></div>}
+            {pageData.profileImageUrl ? <Image src={pageData.profileImageUrl} alt="Logo" fill className="object-cover" sizes="96px" priority/> : <div className="flex items-center justify-center h-full text-white/30 text-3xl"><FaUtensils/></div>}
         </div>
         <h1 className="text-2xl font-bold mb-2">{pageData.title}</h1>
         <p className="text-white/70 text-sm max-w-md mx-auto">{pageData.bio}</p>
         
-        {/* SÓ MOSTRA O BOTÃO SE FOR PRO E TIVER ENDEREÇO */}
+        {isClosed && (
+            <div className="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1 mt-2 animate-pulse">
+                <FaStoreSlash/> FECHADO AGORA
+            </div>
+        )}
+
         {isPro && pageData.address && (
             <div className="flex justify-center mt-4">
                 <button onClick={handleLocation} className="bg-white/10 backdrop-blur border border-white/20 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 hover:bg-white/20 transition">
@@ -135,11 +150,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       <div className="sticky top-0 z-20 bg-theme-bg/95 backdrop-blur py-4 border-b border-white/10">
         <div className="flex overflow-x-auto px-4 gap-2 no-scrollbar">
             {categories.map(cat => (
-                <button 
-                    key={cat} 
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${selectedCategory === cat ? 'bg-orange-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}
-                >
+                <button key={cat} onClick={() => setSelectedCategory(cat)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-bold transition-colors ${selectedCategory === cat ? 'bg-orange-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>
                     {cat}
                 </button>
             ))}
@@ -148,7 +159,7 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
       <main className="container mx-auto max-w-2xl px-4 mt-6 space-y-4">
         {filteredItems.map((item, index) => (
-            <motion.div key={index} initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="bg-white/5 border border-white/10 rounded-xl p-3 flex gap-4">
+            <motion.div key={index} initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className={`bg-white/5 border border-white/10 rounded-xl p-3 flex gap-4 ${isClosed ? 'opacity-50 grayscale' : ''}`}>
                 {item.imageUrl && (
                     <div className="w-24 h-24 rounded-lg bg-gray-800 relative overflow-hidden shrink-0">
                         <Image src={item.imageUrl} alt={item.title} fill className="object-cover" sizes="96px" />
@@ -161,8 +172,8 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
                     </div>
                     <p className="text-xs text-white/60 line-clamp-2 mt-1 mb-2">{item.description}</p>
                     <div className="mt-auto flex justify-end">
-                        <button onClick={() => addToCart(item)} className="bg-white/10 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-orange-500 transition flex items-center gap-1">
-                            Adicionar <FaPlus size={8}/>
+                        <button onClick={() => addToCart(item)} disabled={isClosed} className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 transition ${isClosed ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-orange-500'}`}>
+                            {isClosed ? 'Fechado' : <>Adicionar <FaPlus size={8}/></>}
                         </button>
                     </div>
                 </div>
@@ -172,15 +183,9 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
       <AnimatePresence>
         {cart.length > 0 && (
-            <motion.div 
-                initial={{y: 100}} animate={{y: 0}} exit={{y: 100}}
-                className="fixed bottom-4 left-4 right-4 max-w-2xl mx-auto z-30"
-            >
+            <motion.div initial={{y: 100}} animate={{y: 0}} exit={{y: 100}} className="fixed bottom-4 left-4 right-4 max-w-2xl mx-auto z-30">
                 <button onClick={() => setIsCartOpen(true)} className="w-full bg-green-600 text-white p-4 rounded-xl shadow-2xl flex justify-between items-center font-bold">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-black/20 w-8 h-8 rounded-full flex items-center justify-center text-sm">{cart.reduce((a,b)=>a+b.quantity,0)}</div>
-                        <span>Ver Carrinho</span>
-                    </div>
+                    <div className="flex items-center gap-2"><div className="bg-black/20 w-8 h-8 rounded-full flex items-center justify-center text-sm">{cart.reduce((a,b)=>a+b.quantity,0)}</div><span>Ver Carrinho</span></div>
                     <span>R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
                 </button>
             </motion.div>
@@ -190,36 +195,25 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-4">
             <motion.div initial={{y: 100}} animate={{y: 0}} className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 text-gray-900 max-h-[80vh] overflow-y-auto flex flex-col">
-                <div className="flex justify-between items-center mb-6 border-b pb-4">
-                    <h2 className="text-xl font-bold flex items-center gap-2"><FaShoppingCart/> Seu Pedido</h2>
-                    <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold">Fechar</button>
-                </div>
-                
+                <div className="flex justify-between items-center mb-6 border-b pb-4"><h2 className="text-xl font-bold flex items-center gap-2"><FaShoppingCart/> Seu Pedido</h2><button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold">Fechar</button></div>
                 <div className="flex-1 space-y-4 mb-6">
                     {cart.map((item, idx) => (
                         <div key={idx} className="flex justify-between items-center">
-                            <div>
-                                <p className="font-bold text-sm">{item.title}</p>
-                                <p className="text-orange-600 text-xs font-bold">R$ {item.price}</p>
-                            </div>
+                            <div><p className="font-bold text-sm">{item.title}</p><p className="text-orange-600 text-xs font-bold">R$ {item.price}</p></div>
                             <div className="flex items-center gap-3 bg-gray-100 rounded-lg p-1">
-                                <button onClick={() => updateQuantity(item.title, -1)} className="p-1 hover:bg-white rounded"><FaMinus size={10}/></button>
-                                <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                                <button onClick={() => updateQuantity(item.title, 1)} className="p-1 hover:bg-white rounded"><FaPlus size={10}/></button>
+                                <button onClick={() => updateQuantity(item.title, -1)} className="p-1 hover:bg-white rounded"><FaMinus size={10}/></button><span className="text-sm font-bold w-4 text-center">{item.quantity}</span><button onClick={() => updateQuantity(item.title, 1)} className="p-1 hover:bg-white rounded"><FaPlus size={10}/></button>
                             </div>
                             <button onClick={() => removeFromCart(item.title)} className="text-red-400 hover:text-red-600 p-2"><FaTrash size={12}/></button>
                         </div>
                     ))}
                 </div>
-
                 <div className="border-t pt-4">
-                    <div className="flex justify-between text-lg font-bold mb-4">
-                        <span>Total</span>
-                        <span>R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
-                    </div>
-                    <button onClick={handleCheckout} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-700 flex justify-center items-center gap-2">
-                        <FaWhatsapp size={20}/> Enviar Pedido no Zap
-                    </button>
+                    <div className="flex justify-between text-lg font-bold mb-4"><span>Total</span><span>R$ {cartTotal.toFixed(2).replace('.', ',')}</span></div>
+                    {isClosed ? (
+                        <div className="w-full bg-red-100 text-red-600 py-3 rounded-xl font-bold text-center border border-red-200">LOJA FECHADA</div>
+                    ) : (
+                        <button onClick={handleCheckout} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-700 flex justify-center items-center gap-2"><FaWhatsapp size={20}/> Enviar Pedido no Zap</button>
+                    )}
                 </div>
             </motion.div>
         </div>
