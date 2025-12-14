@@ -2,17 +2,16 @@
 'use client';
 
 import { useEffect, useState, use, useMemo } from 'react';
-import { getPageDataBySlug, PageData, LinkData } from "@/lib/pageService";
+import { getPageDataBySlug, PageData, LinkData, CouponData } from "@/lib/pageService";
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
   FaMapMarkerAlt, FaWhatsapp, FaUtensils, FaPlus, FaMinus, 
   FaShoppingCart, FaTrash, FaStoreSlash, FaExclamationTriangle,
-  FaMotorcycle, FaWalking, FaCreditCard, FaMoneyBillWave, FaQrcode, FaCopy, FaCheckCircle, FaTimes, FaLock
+  FaMotorcycle, FaWalking, FaCreditCard, FaMoneyBillWave, FaQrcode, FaCopy, FaCheckCircle, FaTimes, FaLock, FaTag
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- TIPOS ---
 interface ExtendedPageData extends PageData {
   backgroundImage?: string;
   plan?: string;
@@ -32,12 +31,7 @@ function MenuSkeleton() {
         <div className="w-24 h-24 bg-gray-700 rounded-full mx-auto mb-4"/>
         <div className="h-8 bg-gray-700 w-48 mx-auto mb-2 rounded"/>
         <div className="h-4 bg-gray-700 w-64 mx-auto mb-8 rounded"/>
-        <div className="flex gap-2 mb-8 overflow-hidden">
-            {[1,2,3,4].map(i => <div key={i} className="h-8 w-20 bg-gray-700 rounded-full shrink-0"/>)}
-        </div>
-        <div className="space-y-4">
-            {[1,2,3].map(i => <div key={i} className="bg-gray-800 h-28 rounded-xl w-full"/>)}
-        </div>
+        <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="bg-gray-800 h-28 rounded-xl w-full"/>)}</div>
     </div>
   );
 }
@@ -66,14 +60,18 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
-  const [selectedItem, setSelectedItem] = useState<LinkData | null>(null); // Estado do Zoom
+  const [selectedItem, setSelectedItem] = useState<LinkData | null>(null);
   
   const [orderMethod, setOrderMethod] = useState<OrderMethod>('delivery');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
   const [customerName, setCustomerName] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  
   const [pixCopied, setPixCopied] = useState(false);
+
+  // --- LÓGICA DE CUPOM ---
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponData | null>(null);
+  const [couponError, setCouponError] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -105,7 +103,18 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     return pageData.links.filter(l => (l.category || 'Outros') === selectedCategory);
   }, [pageData, selectedCategory]);
 
-  const cartTotal = cart.reduce((acc, item) => acc + (parseFloat(item.price?.replace(',', '.') || '0') * item.quantity), 0);
+  const cartSubtotal = cart.reduce((acc, item) => acc + (parseFloat(item.price?.replace(',', '.') || '0') * item.quantity), 0);
+  
+  // Calcula desconto
+  const discountAmount = useMemo(() => {
+      if (!appliedCoupon) return 0;
+      if (appliedCoupon.type === 'percent') {
+          return (cartSubtotal * appliedCoupon.value) / 100;
+      }
+      return appliedCoupon.value; // Fixed
+  }, [cartSubtotal, appliedCoupon]);
+
+  const cartTotal = Math.max(0, cartSubtotal - discountAmount);
 
   const addToCart = (item: LinkData) => {
     if (pageData?.isOpen === false) { alert("O estabelecimento está fechado no momento."); return; }
@@ -123,6 +132,22 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
       if (i.title === title) return { ...i, quantity: Math.max(1, i.quantity + delta) };
       return i;
     }));
+  };
+
+  const handleApplyCoupon = () => {
+      if (!pageData?.coupons || !couponCode) return;
+      
+      const found = pageData.coupons.find(c => c.code === couponCode.toUpperCase().trim());
+      
+      if (!found) {
+          setCouponError('Cupom inválido.');
+          setAppliedCoupon(null);
+          return;
+      }
+      
+      // Validações extras (Ex: valor mínimo) poderiam vir aqui
+      setAppliedCoupon(found);
+      setCouponError('');
   };
 
   const handleCopyPix = () => {
@@ -148,7 +173,13 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
     message += `💰 *Pagamento:* ${paymentMethod === 'pix' ? 'Pix' : paymentMethod === 'card' ? 'Cartão' : 'Dinheiro'}\n`;
     message += `------------------------------\n\n*ITENS DO PEDIDO:*\n`;
     cart.forEach(item => { message += `▪️ ${item.quantity}x ${item.title}\n`; });
-    message += `\n*TOTAL: R$ ${cartTotal.toFixed(2).replace('.', ',')}*`;
+    
+    // Resumo de Valores
+    message += `\nSubtotal: R$ ${cartSubtotal.toFixed(2).replace('.', ',')}`;
+    if (appliedCoupon) {
+        message += `\n🎁 Cupom (${appliedCoupon.code}): - R$ ${discountAmount.toFixed(2).replace('.', ',')}`;
+    }
+    message += `\n*TOTAL A PAGAR: R$ ${cartTotal.toFixed(2).replace('.', ',')}*`;
     message += `\n\n_Enviado via CardápioPro_`;
 
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
@@ -158,7 +189,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
   if (loading) return <MenuSkeleton />;
   if (error || !pageData) return <NotFoundState />;
-
   const isPro = pageData.plan === 'pro';
   const isClosed = pageData.isOpen === false;
 
@@ -182,23 +212,13 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
 
       <main className="container mx-auto max-w-2xl px-4 mt-6 space-y-4">
         {filteredItems.map((item, index) => (
-            <motion.div 
-                key={index} 
-                onClick={() => setSelectedItem(item)} // CLIQUE ABRE O ZOOM
-                initial={{opacity:0, y:10}} 
-                animate={{opacity:1, y:0}} 
-                className={`bg-white/5 border border-white/10 rounded-xl p-3 flex gap-4 cursor-pointer hover:bg-white/10 transition ${isClosed ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
-            >
+            <motion.div key={index} onClick={() => setSelectedItem(item)} initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className={`bg-white/5 border border-white/10 rounded-xl p-3 flex gap-4 cursor-pointer hover:bg-white/10 transition ${isClosed ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}>
                 {item.imageUrl && <div className="w-24 h-24 rounded-lg bg-gray-800 relative overflow-hidden shrink-0"><Image src={item.imageUrl} alt={item.title} fill className="object-cover" sizes="96px" /></div>}
                 <div className="flex-1 flex flex-col">
                     <div className="flex justify-between items-start"><h3 className="font-bold text-white">{item.title}</h3>{item.price && <span className="text-orange-400 font-bold text-sm">R$ {item.price}</span>}</div>
                     <p className="text-xs text-white/60 line-clamp-2 mt-1 mb-2">{item.description}</p>
                     <div className="mt-auto flex justify-end">
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); addToCart(item); }} 
-                            disabled={isClosed} 
-                            className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 transition ${isClosed ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-orange-500'}`}
-                        >
+                        <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} disabled={isClosed} className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 transition ${isClosed ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-white/10 text-white hover:bg-orange-500'}`}>
                             {isClosed ? 'Fechado' : <>Adicionar <FaPlus size={8}/></>}
                         </button>
                     </div>
@@ -207,7 +227,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         ))}
       </main>
 
-      {/* --- MODAL DE ZOOM (DETALHES) --- */}
       <AnimatePresence>
         {selectedItem && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedItem(null)} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
@@ -235,7 +254,6 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
         )}
       </AnimatePresence>
 
-      {/* --- MODAL CARRINHO --- */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-4">
             <motion.div initial={{y: 100}} animate={{y: 0}} className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-6 text-gray-900 max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl">
@@ -259,6 +277,30 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
                     </div>
                     {orderMethod === 'delivery' && <textarea placeholder="Endereço completo (Rua, Número, Bairro...)" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} className="w-full border p-2 rounded text-sm outline-none focus:border-green-500 h-16 resize-none animate-in fade-in slide-in-from-top-1" />}
                     
+                    {/* ÁREA DE CUPOM */}
+                    <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold text-gray-500 uppercase">Cupom de Desconto</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="Código" 
+                                    value={couponCode} 
+                                    onChange={e => setCouponCode(e.target.value)} 
+                                    disabled={!!appliedCoupon}
+                                    className="w-full border p-2 rounded text-sm outline-none uppercase font-bold text-gray-700 disabled:bg-gray-100" 
+                                />
+                                {appliedCoupon ? (
+                                    <button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} className="bg-red-100 text-red-600 px-3 rounded text-sm font-bold"><FaTrash/></button>
+                                ) : (
+                                    <button onClick={handleApplyCoupon} className="bg-purple-600 text-white px-4 rounded text-sm font-bold hover:bg-purple-700">Aplicar</button>
+                                )}
+                            </div>
+                            {couponError && <p className="text-red-500 text-xs mt-1">{couponError}</p>}
+                            {appliedCoupon && <p className="text-green-600 text-xs mt-1 font-bold flex items-center gap-1"><FaCheckCircle/> Cupom aplicado: - R$ {discountAmount.toFixed(2)}</p>}
+                        </div>
+                    </div>
+
                     <div className="flex gap-2 pt-2">
                         {[{ id: 'pix', label: 'Pix', icon: FaQrcode }, { id: 'card', label: 'Cartão', icon: FaCreditCard }, { id: 'cash', label: 'Dinheiro', icon: FaMoneyBillWave }].map(pm => (
                             <button key={pm.id} onClick={() => setPaymentMethod(pm.id as PaymentMethod)} className={`flex-1 py-2 rounded text-[10px] sm:text-xs font-bold flex flex-col items-center gap-1 border transition ${paymentMethod === pm.id ? 'bg-green-100 border-green-500 text-green-700' : 'bg-white border-gray-300 text-gray-500'}`}>
@@ -267,37 +309,35 @@ export default function MenuPage({ params }: { params: Promise<{ slug: string }>
                         ))}
                     </div>
                     
-                    {/* ÁREA DO PIX (AGORA COM AVISO SE FOR FREE) */}
                     {paymentMethod === 'pix' && (
                         <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl text-center animate-in fade-in zoom-in shadow-sm">
                             {isPro ? (
                                 pageData?.pixKey ? (
                                     <>
                                         <p className="text-xs font-bold text-gray-500 mb-2">Escaneie para pagar</p>
-                                        <div className="bg-white p-1 inline-block mb-3">
-                                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(pageData.pixKey)}`} alt="QR Pix" className="w-32 h-32 mx-auto mix-blend-multiply" />
-                                        </div>
+                                        <div className="bg-white p-1 inline-block mb-3"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(pageData.pixKey)}`} alt="QR Pix" className="w-32 h-32 mx-auto mix-blend-multiply" /></div>
                                         <div className="bg-gray-100 p-2 rounded text-xs text-gray-600 font-mono break-all mb-2">{pageData.pixKey}</div>
-                                        <button onClick={handleCopyPix} className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${pixCopied ? 'bg-green-500 text-white' : 'bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200'}`}>
-                                            {pixCopied ? <><FaCheckCircle className="inline mr-1"/> Copiado!</> : <><FaCopy className="inline mr-1"/> Copiar Chave Pix</>}
-                                        </button>
+                                        <button onClick={handleCopyPix} className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${pixCopied ? 'bg-green-500 text-white' : 'bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200'}`}>{pixCopied ? <><FaCheckCircle className="inline mr-1"/> Copiado!</> : <><FaCopy className="inline mr-1"/> Copiar Chave Pix</>}</button>
                                     </>
-                                ) : (
-                                    <p className="text-xs text-gray-400 italic">Chave Pix não cadastrada pelo estabelecimento.</p>
-                                )
+                                ) : <p className="text-xs text-gray-400 italic">Chave Pix não cadastrada pelo estabelecimento.</p>
                             ) : (
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="bg-gray-100 p-2 rounded-full"><FaLock className="text-gray-400" /></div>
-                                    <p className="text-xs text-gray-500 font-bold">QR Code Automático Indisponível</p>
-                                    <p className="text-[10px] text-gray-400">Este é um recurso do plano Profissional.</p>
-                                </div>
+                                <div className="flex flex-col items-center gap-2"><div className="bg-gray-100 p-2 rounded-full"><FaLock className="text-gray-400" /></div><p className="text-xs text-gray-500 font-bold">QR Code Automático Indisponível</p><p className="text-[10px] text-gray-400">Este é um recurso do plano Profissional.</p></div>
                             )}
                         </div>
                     )}
                 </div>
 
                 <div className="border-t pt-4">
-                    <div className="flex justify-between text-lg font-bold mb-4"><span>Total</span><span>R$ {cartTotal.toFixed(2).replace('.', ',')}</span></div>
+                    <div className="space-y-1 mb-4">
+                        <div className="flex justify-between text-sm text-gray-500"><span>Subtotal</span><span>R$ {cartSubtotal.toFixed(2).replace('.', ',')}</span></div>
+                        {appliedCoupon && (
+                            <div className="flex justify-between text-sm text-green-600 font-bold">
+                                <span>Desconto ({appliedCoupon.code})</span>
+                                <span>- R$ {discountAmount.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between text-lg font-bold text-gray-900 mt-2"><span>Total</span><span>R$ {cartTotal.toFixed(2).replace('.', ',')}</span></div>
+                    </div>
                     {isClosed ? <div className="w-full bg-red-100 text-red-600 py-3 rounded-xl font-bold text-center border border-red-200">LOJA FECHADA</div> : <button onClick={handleCheckout} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-green-700 flex justify-center items-center gap-2 transform active:scale-95 transition"><FaWhatsapp size={20}/> Enviar Pedido no Zap</button>}
                 </div>
             </motion.div>

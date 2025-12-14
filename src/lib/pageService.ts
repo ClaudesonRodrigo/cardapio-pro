@@ -20,6 +20,15 @@ export type LinkData = {
   category?: string;
 };
 
+// NOVO TIPO: Cupom
+export type CouponData = {
+  code: string;       // Código (Ex: NATAL10)
+  type: 'percent' | 'fixed'; // Tipo (10% ou R$ 10,00)
+  value: number;      // Valor do desconto
+  minValue?: number;  // Pedido mínimo (opcional)
+  active: boolean;    // Se está valendo
+};
+
 export type PageData = {
   title: string;
   bio: string;
@@ -29,11 +38,12 @@ export type PageData = {
   profileImageUrl?: string;
   backgroundImage?: string;
   links: LinkData[];
+  coupons?: CouponData[]; // LISTA DE CUPONS
   theme?: string;
   userId: string;
   slug: string;
   plan?: string;
-  trialDeadline?: Timestamp; // Campo novo
+  trialDeadline?: Timestamp;
   isOpen?: boolean;
   createdAt?: any;
 };
@@ -47,15 +57,12 @@ export type UserData = {
   trialDeadline?: Timestamp;
 };
 
-// FUNÇÃO AUXILIAR: Verifica se o plano venceu
+// FUNÇÃO AUXILIAR: Verifica validade do plano
 const checkPlanValidity = (data: any) => {
     if (data.plan === 'pro' && data.trialDeadline) {
         const now = new Date();
         const deadline = data.trialDeadline.toDate();
-        // Se a data de hoje for maior que o prazo, rebaixa para Free
-        if (now > deadline) {
-            return 'free'; 
-        }
+        if (now > deadline) return 'free'; 
     }
     return data.plan || 'free';
 };
@@ -91,7 +98,6 @@ export const getPageDataForUser = async (userId: string): Promise<{ slug: string
       if (!pagesSnap.empty) {
         const pageDoc = pagesSnap.docs[0];
         const pageData = pageDoc.data();
-        // Aplica a verificação de validade
         const realPlan = checkPlanValidity(userData); 
         return { slug: pageDoc.id, data: { ...pageData, plan: realPlan } };
       }
@@ -103,7 +109,6 @@ export const getPageDataForUser = async (userId: string): Promise<{ slug: string
 
     if (pageDocSnap.exists()) {
        const pageData = pageDocSnap.data();
-       // Aplica a verificação de validade baseada no User (que é a fonte da verdade)
        const realPlan = checkPlanValidity(userData);
        return { slug: pageSlug, data: { ...pageData, plan: realPlan } };
     }
@@ -121,12 +126,8 @@ export const getPageDataBySlug = async (slug: string): Promise<DocumentData | nu
     if (!pageDocSnap.exists()) return null;
 
     const pageData = pageDocSnap.data();
-    
-    // Verifica a validade direto no objeto da página
     const realPlan = checkPlanValidity(pageData);
-
     return { ...pageData, plan: realPlan }; 
-
   } catch (error) { return null; }
 };
 
@@ -145,6 +146,12 @@ export const deleteLinkFromPage = async (pageSlug: string, linkToDelete: LinkDat
 export const updateLinksOnPage = async (pageSlug: string, updatedLinks: LinkData[]): Promise<void> => {
   const pageDocRef = doc(db, "pages", pageSlug);
   await updateDoc(pageDocRef, { links: updatedLinks });
+};
+
+// NOVA FUNÇÃO: Atualizar lista de cupons
+export const updatePageCoupons = async (pageSlug: string, coupons: CouponData[]): Promise<void> => {
+  const pageDocRef = doc(db, "pages", pageSlug);
+  await updateDoc(pageDocRef, { coupons });
 };
 
 export const updatePageTheme = async (pageSlug: string, theme: string): Promise<void> => {
@@ -170,7 +177,6 @@ export const updatePageProfileInfo = async (
 export const incrementLinkClick = async (pageSlug: string, itemId: string): Promise<void> => {
   try {
     const pageDocRef = doc(db, "pages", pageSlug);
-    // Otimização: Update direto se possível, mas mantemos leitura segura
     const pageSnap = await getDoc(pageDocRef);
     if (pageSnap.exists()) {
       const pageData = pageSnap.data() as PageData;
@@ -193,13 +199,10 @@ export const findUserByEmail = async (email: string): Promise<(UserData & { uid:
 };
 
 export const updateUserPlan = async (userId: string, newPlan: 'free' | 'pro'): Promise<void> => {
-  // Quando o Admin muda o plano, removemos a data de expiração (vira vitalício ou assinatura mensal)
   await updateDoc(doc(db, "users", userId), { plan: newPlan, trialDeadline: null });
-
   const pagesRef = collection(db, "pages");
   const q = query(pagesRef, where("userId", "==", userId));
   const snapshot = await getDocs(q);
-
   if (!snapshot.empty) {
       const pageId = snapshot.docs[0].id;
       await updateDoc(doc(db, "pages", pageId), { plan: newPlan, trialDeadline: null });
