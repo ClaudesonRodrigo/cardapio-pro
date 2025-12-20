@@ -7,19 +7,20 @@ import { useAuth } from '@/context/AuthContext';
 import { signOutUser } from '@/lib/authService';
 import {
   getPageDataForUser, addLinkToPage, deleteLinkFromPage, updateLinksOnPage,
-  updatePageTheme, updatePageBackground, updateProfileImage, updatePageProfileInfo, updatePageCoupons,
-  getAllUsers, // <--- IMPORTADO AQUI
+  updatePageTheme, updatePageBackground, updateProfileImage, updatePageProfileInfo, updatePageCoupons, updateUserFiscalData,
+  getAllUsers, 
   PageData, LinkData, UserData, CouponData, findUserByEmail, updateUserPlan
 } from '@/lib/pageService';
 import { 
-  FaUserCog, FaImage, FaSave, FaQrcode, FaTag, FaTrashAlt,
-  FaUtensils, FaPlus, FaCamera, FaCopy, FaExternalLinkAlt, FaLock, FaMapMarkerAlt, FaStore, FaDoorOpen, FaDoorClosed, FaWhatsapp, FaKey, FaClock, FaUsers, FaSearch
+  FaUserCog, FaImage, FaSave, FaQrcode, FaChartLine, FaTag, FaTrashAlt,
+  FaUtensils, FaPlus, FaTrash, FaCamera, FaCopy, FaExternalLinkAlt, FaLock, FaMapMarkerAlt, FaStore, FaDoorOpen, FaDoorClosed, FaWhatsapp, FaKey, FaClock, FaUsers, FaSearch, FaHeadset
 } from 'react-icons/fa';
 import Image from 'next/image';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableLinkItem } from '@/components/SortableLinkItem';
 import { QRCodeCanvas } from 'qrcode.react';
+import FiscalModal from '@/components/FiscalModal'; 
 
 const CLOUDINARY_CLOUD_NAME = "dhzzvc3vl"; 
 const CLOUDINARY_UPLOAD_PRESET = "links-page-pro"; 
@@ -44,8 +45,8 @@ export default function DashboardPage() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   
-  // Lista de Usuários (Super Admin)
-  const [allUsers, setAllUsers] = useState<(UserData & { uid: string })[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false); 
+  const [isFiscalModalOpen, setIsFiscalModalOpen] = useState(false); 
 
   // Campos do Prato
   const [newItemTitle, setNewItemTitle] = useState('');
@@ -88,6 +89,9 @@ export default function DashboardPage() {
   const [foundUser, setFoundUser] = useState<(UserData & { uid: string }) | null>(null);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [isUpdatingPlan, setIsUpdatingPlan] = useState(false);
+  
+  // Lista de Usuários (Super Admin)
+  const [allUsers, setAllUsers] = useState<(UserData & { uid: string, createdAt?: any })[]>([]);
 
   const isProPlan = targetUserId ? true : (pageData?.plan === 'pro');
 
@@ -97,6 +101,62 @@ export default function DashboardPage() {
   );
 
   const existingCategories = Array.from(new Set(pageData?.links?.map(l => l.category).filter(Boolean) || []));
+
+  // --- NOVA LÓGICA DE ASSINATURA ---
+  const handleSubscribeClick = () => {
+    // Usando 'as any' para evitar erro de tipo caso cpfCnpj não esteja no UserData
+    const userWithFiscal = userData as any;
+    if (userWithFiscal?.cpfCnpj) {
+        processSubscription(userWithFiscal.cpfCnpj, userWithFiscal.phone || '');
+    } else {
+        setIsFiscalModalOpen(true);
+    }
+  };
+
+  const saveFiscalDataAndSubscribe = async (cpf: string, phone: string) => {
+    if (!user) return;
+    setIsFiscalModalOpen(false);
+    setIsProcessing(true);
+    try {
+        await updateUserFiscalData(user.uid, cpf, phone);
+        await processSubscription(cpf, phone);
+    } catch (error) {
+        console.error("Erro ao salvar dados:", error);
+        alert("Erro ao salvar seus dados. Tente novamente.");
+        setIsProcessing(false);
+    }
+  };
+
+  const processSubscription = async (cpf: string, phone: string) => {
+    if (!user) return;
+    setIsProcessing(true);
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            user: { 
+                uid: user.uid, 
+                email: user.email, 
+                displayName: user.displayName,
+                cpfCnpj: cpf, 
+                phone: phone 
+            } 
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert("✅ Sucesso! O link de pagamento foi enviado para o seu e-mail.");
+      } else {
+        alert("Erro ao processar assinatura: " + (data.error || "Tente novamente."));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Erro de conexão. Tente novamente.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const uploadToCloudinary = async (file: File): Promise<string> => {
     const formData = new FormData();
@@ -160,17 +220,11 @@ export default function DashboardPage() {
     }
   }, [user, targetUserId]);
 
-  // EFEITO PARA CARREGAR A LISTA SE FOR ADMIN
+  // CARREGA A LISTA DE USUÁRIOS SE FOR ADMIN
   useEffect(() => {
       if (user && isAdmin) {
           const fetchAll = async () => {
               const users = await getAllUsers();
-              // Ordenação local para não depender de index do Firebase
-              // Ordena por data de criação (se tiver) ou por email
-              users.sort((a: any, b: any) => {
-                  if (b.createdAt && a.createdAt) return b.createdAt.seconds - a.createdAt.seconds;
-                  return 0;
-              });
               setAllUsers(users);
           };
           fetchAll();
@@ -319,7 +373,14 @@ export default function DashboardPage() {
   if (loading || (!isAdmin && isLoadingData)) return <div className="flex items-center justify-center min-h-screen">Carregando...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans relative">
+      
+      <FiscalModal 
+        isOpen={isFiscalModalOpen} 
+        onClose={() => setIsFiscalModalOpen(false)} 
+        onSave={saveFiscalDataAndSubscribe} 
+      />
+
       <nav className="bg-white shadow-sm sticky top-0 z-20">
          <div className="max-w-4xl mx-auto px-4 h-16 flex justify-between items-center">
             <h1 className="font-bold text-gray-800 flex gap-2 items-center"><FaUtensils className="text-orange-500"/> Gestor de Cardápio</h1>
@@ -329,6 +390,7 @@ export default function DashboardPage() {
 
       <main className="max-w-4xl mx-auto py-8 px-4 space-y-6">
         
+        {/* BANNER DE TRIAL */}
         {daysLeft !== null && (
             <div className={`p-4 rounded-xl flex items-center justify-between shadow-sm ${daysLeft > 0 ? 'bg-yellow-100 border border-yellow-300 text-yellow-800' : 'bg-red-100 border border-red-300 text-red-800'}`}>
                 <div className="flex items-center gap-3">
@@ -338,16 +400,18 @@ export default function DashboardPage() {
                         <p className="text-xs opacity-80">{daysLeft > 0 ? 'Aproveite todos os recursos liberados!' : 'Seus recursos Pro foram bloqueados. Assine para continuar.'}</p>
                     </div>
                 </div>
-                {/* Botão de Assinar removido temporariamente na versão segura */}
                 <button 
-                    onClick={() => alert("Chame no WhatsApp para assinar: (79) 99963-3795")} 
-                    className="bg-black text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-800"
+                    onClick={handleSubscribeClick}
+                    disabled={isProcessing}
+                    className="bg-black text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-800 disabled:opacity-50"
                 >
-                    Assinar Agora
+                    {isProcessing ? 'Processando...' : 'Assinar Agora'}
                 </button>
             </div>
         )}
 
+        {/* ... (CÓDIGO EXISTENTE: Perfil, Divulgação, Cupons, Pratos, Lista, Temas, Admin) ... */}
+        {/* Mantive todo o código anterior aqui para garantir que nada quebre */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-start">
             <div className="flex flex-col items-center gap-3 shrink-0">
                 <div className="relative w-24 h-24">
@@ -358,28 +422,23 @@ export default function DashboardPage() {
                 </div>
                 <button onClick={() => setIsOpenStore(!isOpenStore)} className={`w-full py-1.5 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1 transition-colors ${isOpenStore ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{isOpenStore ? <><FaDoorOpen/> Aberto</> : <><FaDoorClosed/> Fechado</>}</button>
             </div>
-
             <div className="flex-1 w-full space-y-3">
                 <input type="text" value={editingProfileTitle} onChange={e => setEditingProfileTitle(e.target.value)} className="w-full text-lg font-bold border-b border-gray-300 focus:border-orange-500 outline-none" placeholder="Nome do Restaurante" />
                 <textarea value={editingProfileBio} onChange={e => setEditingProfileBio(e.target.value)} className="w-full text-sm border rounded p-2 focus:border-orange-500 outline-none resize-none" rows={2} placeholder="Descrição / Horário de Funcionamento" />
-                
                 <div className="flex items-center border rounded-lg overflow-hidden bg-white border-gray-300 focus-within:border-green-500 transition-all">
                     <div className="bg-gray-100 px-3 py-2 border-r border-gray-200 flex items-center gap-1 text-gray-500 font-bold text-sm shrink-0"><FaWhatsapp className="text-green-500" /> +55</div>
                     <input type="tel" value={editingProfileWhatsapp} onChange={e => setEditingProfileWhatsapp(e.target.value.replace(/\D/g, ''))} className="w-full text-sm bg-transparent outline-none px-3 py-2" placeholder="DDD + Número (WhatsApp)" maxLength={11} />
                 </div>
-
                 <div className={`flex items-center gap-2 border rounded p-2 transition-colors ${isProPlan ? 'bg-gray-50 focus-within:border-blue-500 focus-within:bg-white' : 'bg-gray-100 opacity-60 cursor-not-allowed'}`}>
                     <FaKey className="text-blue-500" />
                     <input type="text" value={editingProfilePix} onChange={e => setEditingProfilePix(e.target.value)} className={`w-full text-sm bg-transparent outline-none ${!isProPlan ? 'cursor-not-allowed' : ''}`} placeholder={isProPlan ? "Chave Pix (CPF, Email, Telefone)" : "Chave Pix (Recurso Pro)"} disabled={!isProPlan}/>
                     {!isProPlan && <FaLock className="text-gray-400" />}
                 </div>
-
                 <div className={`flex items-center gap-2 border rounded p-2 ${isProPlan ? 'bg-gray-50' : 'bg-gray-100 opacity-60 cursor-not-allowed'}`}>
                     <FaMapMarkerAlt className="text-gray-400" />
                     <input type="text" value={editingProfileAddress} onChange={e => setEditingProfileAddress(e.target.value)} className={`w-full text-sm bg-transparent outline-none ${!isProPlan ? 'cursor-not-allowed' : ''}`} placeholder={isProPlan ? "Endereço Completo" : "Endereço (Recurso Pro)"} disabled={!isProPlan} />
                     {!isProPlan && <FaLock className="text-gray-400" />}
                 </div>
-
                 <button onClick={handleSaveProfile} className="bg-orange-600 text-white px-4 py-2 rounded text-sm font-bold flex gap-2 hover:bg-orange-700 transition w-fit"><FaSave/> Salvar Dados</button>
             </div>
         </div>
@@ -423,7 +482,6 @@ export default function DashboardPage() {
                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><FaTag className="text-purple-500" /> Cupons de Desconto</h3>
                  {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full flex items-center gap-1 font-bold"><FaLock size={10}/> Recurso Pro</span>}
              </div>
-             
              <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-purple-50 rounded-xl border border-purple-100">
                  <div className="flex-1">
                      <label className="text-xs font-bold text-purple-800 uppercase mb-1 block">Código (Ex: VIP10)</label>
@@ -444,7 +502,6 @@ export default function DashboardPage() {
                      <button onClick={handleAddCoupon} className="bg-purple-600 text-white px-6 py-2 rounded font-bold text-sm hover:bg-purple-700 h-10 w-full md:w-auto">Criar</button>
                  </div>
              </div>
-
              <div className="space-y-2">
                  {pageData?.coupons && pageData.coupons.length > 0 ? (
                      pageData.coupons.map((coupon, idx) => (
@@ -584,7 +641,7 @@ export default function DashboardPage() {
                     <table className="w-full text-sm text-left">
                         <thead className="bg-gray-900 text-gray-400 font-bold uppercase text-xs">
                             <tr>
-                                <th className="p-3">Data Cadastro</th>
+                                <th className="p-3">Data</th>
                                 <th className="p-3">Nome</th>
                                 <th className="p-3">Email</th>
                                 <th className="p-3">Plano</th>
@@ -595,7 +652,6 @@ export default function DashboardPage() {
                             {allUsers.map((u) => (
                                 <tr key={u.uid} className="hover:bg-gray-600 transition">
                                     <td className="p-3 text-gray-400 text-xs">
-                                        {/* Tenta pegar a data, se não tiver mostra traço */}
                                         {u.createdAt?.seconds ? new Date(u.createdAt.seconds * 1000).toLocaleDateString() : '-'}
                                     </td>
                                     <td className="p-3 font-bold text-white">{u.displayName || 'Sem Nome'}</td>
@@ -638,6 +694,18 @@ export default function DashboardPage() {
             </div>
         )}
       </main>
+
+      {/* BOTÃO FLUTUANTE DE SUPORTE - AQUI ESTÁ ELE! */}
+      <a
+        href="https://wa.me/5579996337995?text=Olá! Preciso de ajuda com o CardápioPro."
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-5 right-5 z-50 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-full shadow-xl flex items-center gap-2 transition-transform transform hover:scale-105 font-bold animate-in fade-in zoom-in"
+      >
+        <FaWhatsapp size={24} />
+        <span className="hidden md:block">Suporte</span>
+      </a>
+
     </div>
   );
 }

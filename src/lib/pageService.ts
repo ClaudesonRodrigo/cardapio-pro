@@ -64,7 +64,7 @@ export type UserData = {
   createdAt?: any;    // <--- ADICIONE ESTA LINHA (Resolve o erro da data)
 };
 
-// ... (resto do arquivo)
+// ... (resto do arquivo) 
 
 // FUNÇÃO AUXILIAR
 const checkPlanValidity = (data: any) => {
@@ -232,4 +232,10 @@ export const updateUserPlan = async (userId: string, newPlan: 'free' | 'pro'): P
       const pageId = snapshot.docs[0].id;
       await updateDoc(doc(db, "pages", pageId), { plan: newPlan, trialDeadline: null });
   }
+};
+
+// Atualiza dados fiscais do usuário (CPF/Telefone)
+export const updateUserFiscalData = async (userId: string, cpfCnpj: string, phone: string): Promise<void> => {
+  const userRef = doc(db, "users", userId);
+  await updateDoc(userRef, { cpfCnpj, phone });
 };
