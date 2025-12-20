@@ -22,8 +22,13 @@ import { SortableLinkItem } from '@/components/SortableLinkItem';
 import { QRCodeCanvas } from 'qrcode.react';
 import FiscalModal from '@/components/FiscalModal'; 
 
-const CLOUDINARY_CLOUD_NAME = "dhzzvc3vl"; 
-const CLOUDINARY_UPLOAD_PRESET = "links-page-pro"; 
+
+const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "";
+const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "";
+
+if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+  console.error("⚠️ ERRO: Chaves do Cloudinary não configuradas no .env.local");
+}
 
 const themes = [
   { name: 'restaurant', label: 'Bistrô', colorClass: 'bg-red-900', isPro: false },
@@ -411,7 +416,6 @@ export default function DashboardPage() {
         )}
 
         {/* ... (CÓDIGO EXISTENTE: Perfil, Divulgação, Cupons, Pratos, Lista, Temas, Admin) ... */}
-        {/* Mantive todo o código anterior aqui para garantir que nada quebre */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-start">
             <div className="flex flex-col items-center gap-3 shrink-0">
                 <div className="relative w-24 h-24">
@@ -597,7 +601,7 @@ export default function DashboardPage() {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
              <h3 className="font-bold text-gray-800 mb-4">Aparência & Temas</h3>
              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                 <label className="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+                 <label className="text-sm font-bold text-gray-700 mb-2 block items-center gap-2">
                     <FaImage /> Imagem de Fundo (Capa)
                     {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 rounded-full flex items-center gap-1"><FaLock size={10}/> Pro</span>}
                  </label>
