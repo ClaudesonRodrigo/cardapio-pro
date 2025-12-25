@@ -40,6 +40,7 @@ export type PageData = {
   links: LinkData[];
   coupons?: CouponData[]; 
   theme?: string;
+  customThemeColor?: string; // <--- NOVO CAMPO
   userId: string;
   slug: string;
   plan?: string;
@@ -48,10 +49,6 @@ export type PageData = {
   createdAt?: any;
 };
 
-// src/lib/pageService.ts
-
-// ... (imports)
-
 export type UserData = {
   plan: string;
   pageSlug: string;
@@ -59,15 +56,14 @@ export type UserData = {
   email?: string;
   role?: string;
   trialDeadline?: any; 
-  cpfCnpj?: string;   // Garante que o Modal de CPF funciona
-  phone?: string;     // Garante que o telefone funciona
-  createdAt?: any;    // <--- ADICIONE ESTA LINHA (Resolve o erro da data)
+  cpfCnpj?: string;   
+  phone?: string;     
+  createdAt?: any;    
 };
-
-// ... (resto do arquivo) 
 
 // FUNÇÃO AUXILIAR
 const checkPlanValidity = (data: any) => {
+    if (!data) return 'free';
     if (data.plan === 'pro' && data.trialDeadline) {
         const now = new Date();
         const deadline = data.trialDeadline.toDate();
@@ -107,7 +103,10 @@ export const getPageDataForUser = async (userId: string): Promise<{ slug: string
       if (!pagesSnap.empty) {
         const pageDoc = pagesSnap.docs[0];
         const pageData = pageDoc.data();
-        const realPlan = checkPlanValidity(userData); 
+        
+        const sourceOfData = userData?.plan ? userData : pageData;
+        const realPlan = checkPlanValidity(sourceOfData); 
+        
         return { slug: pageDoc.id, data: { ...pageData, plan: realPlan } };
       }
       return null;
@@ -118,7 +117,8 @@ export const getPageDataForUser = async (userId: string): Promise<{ slug: string
 
     if (pageDocSnap.exists()) {
        const pageData = pageDocSnap.data();
-       const realPlan = checkPlanValidity(userData);
+       const sourceOfData = userData?.plan ? userData : pageData;
+       const realPlan = checkPlanValidity(sourceOfData);
        return { slug: pageSlug, data: { ...pageData, plan: realPlan } };
     }
     return null;
@@ -140,13 +140,10 @@ export const getPageDataBySlug = async (slug: string): Promise<DocumentData | nu
   } catch (error) { return null; }
 };
 
-// NOVO: Busca TODOS os usuários (Para o Painel Admin)
 export const getAllUsers = async (): Promise<(UserData & { uid: string, createdAt?: any })[]> => {
   try {
     const usersRef = collection(db, "users");
-    // Sem orderBy por enquanto para evitar erro de índice no Firebase
     const snapshot = await getDocs(usersRef);
-    
     return snapshot.docs.map(doc => ({
       uid: doc.id,
       ...(doc.data() as UserData)
@@ -179,8 +176,13 @@ export const updatePageCoupons = async (pageSlug: string, coupons: CouponData[])
   await updateDoc(pageDocRef, { coupons });
 };
 
-export const updatePageTheme = async (pageSlug: string, theme: string): Promise<void> => {
-  await updateDoc(doc(db, "pages", pageSlug), { theme });
+// ATUALIZADO: Aceita cor personalizada
+export const updatePageTheme = async (pageSlug: string, theme: string, customColor?: string): Promise<void> => {
+  const updateData: any = { theme };
+  if (customColor) {
+    updateData.customThemeColor = customColor;
+  }
+  await updateDoc(doc(db, "pages", pageSlug), updateData);
 };
 
 export const updatePageBackground = async (pageSlug: string, imageUrl: string): Promise<void> => {
@@ -234,7 +236,6 @@ export const updateUserPlan = async (userId: string, newPlan: 'free' | 'pro'): P
   }
 };
 
-// Atualiza dados fiscais do usuário (CPF/Telefone)
 export const updateUserFiscalData = async (userId: string, cpfCnpj: string, phone: string): Promise<void> => {
   const userRef = doc(db, "users", userId);
   await updateDoc(userRef, { cpfCnpj, phone });

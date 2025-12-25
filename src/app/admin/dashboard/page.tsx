@@ -23,7 +23,6 @@ import { QRCodeCanvas } from 'qrcode.react';
 import FiscalModal from '@/components/FiscalModal';
 import { UpgradeModal } from '@/components/UpgradeModal';
 
-// Pega chaves do .env ou usa string vazia para não quebrar
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || ""; 
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "";
 
@@ -104,7 +103,6 @@ export default function DashboardPage() {
 
   const existingCategories = Array.from(new Set(pageData?.links?.map(l => l.category).filter(Boolean) || []));
 
-  // --- LÓGICA DE ASSINATURA MANUAL ---
   const handleSubscribeClick = () => {
     setIsUpgradeModalOpen(true); 
   };
@@ -312,9 +310,13 @@ export default function DashboardPage() {
       setTimeout(() => setCopyButtonText("Copiar Link"), 2000);
   };
 
-  const handleThemeChange = async (themeName: string) => {
+  // Função atualizada para lidar com o Custom Theme
+  const handleThemeChange = async (themeName: string, customColor?: string) => {
       if (!pageSlug) return;
-      try { await updatePageTheme(pageSlug, themeName); setPageData(prev => prev ? { ...prev, theme: themeName } : null); }
+      try { 
+          await updatePageTheme(pageSlug, themeName, customColor); 
+          setPageData(prev => prev ? { ...prev, theme: themeName, customThemeColor: customColor } : null); 
+      }
       catch { alert("Erro ao mudar tema."); }
   };
 
@@ -345,7 +347,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans relative">
       
-      {/* MODAL MANUAL DE PIX */}
       <UpgradeModal 
         isOpen={isUpgradeModalOpen} 
         onClose={() => setIsUpgradeModalOpen(false)} 
@@ -366,6 +367,7 @@ export default function DashboardPage() {
 
       <main className="max-w-4xl mx-auto py-8 px-4 space-y-6">
         
+        {/* BANNER TRIAL */}
         {daysLeft !== null && (
             <div className={`p-4 rounded-xl flex items-center justify-between shadow-sm ${daysLeft > 0 ? 'bg-yellow-100 border border-yellow-300 text-yellow-800' : 'bg-red-100 border border-red-300 text-red-800'}`}>
                 <div className="flex items-center gap-3">
@@ -458,7 +460,6 @@ export default function DashboardPage() {
                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><FaTag className="text-purple-500" /> Cupons de Desconto</h3>
                  {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full flex items-center gap-1 font-bold"><FaLock size={10}/> Recurso Pro</span>}
              </div>
-             
              <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-purple-50 rounded-xl border border-purple-100">
                  <div className="flex-1">
                      <label className="text-xs font-bold text-purple-800 uppercase mb-1 block">Código (Ex: VIP10)</label>
@@ -479,7 +480,6 @@ export default function DashboardPage() {
                      <button onClick={handleAddCoupon} className="bg-purple-600 text-white px-6 py-2 rounded font-bold text-sm hover:bg-purple-700 h-10 w-full md:w-auto">Criar</button>
                  </div>
              </div>
-
              <div className="space-y-2">
                  {pageData?.coupons && pageData.coupons.length > 0 ? (
                      pageData.coupons.map((coupon, idx) => (
@@ -527,7 +527,7 @@ export default function DashboardPage() {
             </form>
         </div>
 
-        {/* LISTA DE PRATOS */}
+        {/* CARDÁPIO ATUAL */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="font-bold text-gray-800 mb-4">Cardápio Atual</h3>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -574,11 +574,13 @@ export default function DashboardPage() {
             </DndContext>
         </div>
 
-        {/* TEMAS */}
+        {/* APARÊNCIA & TEMAS (ATUALIZADO COM COLOR PICKER) */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8">
              <h3 className="font-bold text-gray-800 mb-4">Aparência & Temas</h3>
+             
+             {/* IMAGEM DE FUNDO (Capa) */}
              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                 <label className="text-sm font-bold text-gray-700 mb-2 block items-center gap-2">
+                 <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
                     <FaImage /> Imagem de Fundo (Capa)
                     {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 rounded-full flex items-center gap-1"><FaLock size={10}/> Pro</span>}
                  </label>
@@ -597,7 +599,26 @@ export default function DashboardPage() {
                  </div>
              </div>
              
+             {/* SELETOR DE TEMAS */}
              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {/* 1. Botão Personalizado (Color Picker) */}
+                <div className={`p-2 border rounded text-center text-xs relative overflow-hidden transition-all ${pageData?.theme === 'custom' ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' : 'border-gray-200 hover:border-orange-300'} ${!isProPlan ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                    <div className="w-full h-8 rounded mb-1 shadow-sm bg-linear-to-r from-pink-500 via-red-500 to-yellow-500 relative flex items-center justify-center">
+                        {isProPlan && (
+                            <input 
+                                type="color" 
+                                className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
+                                value={pageData?.customThemeColor || '#000000'}
+                                onChange={(e) => handleThemeChange('custom', e.target.value)}
+                            />
+                        )}
+                    </div>
+                    <span className="font-medium text-gray-700">Cor Própria</span>
+                    {!isProPlan && <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]"><FaLock className="text-white drop-shadow-md"/></div>}
+                    {pageData?.theme === 'custom' && <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5 text-[8px]"><FaCheck/></div>}
+                </div>
+
+                {/* 2. Temas Padrão */}
                 {themes.map(t => {
                     const locked = t.isPro && !isProPlan;
                     return (
@@ -615,7 +636,6 @@ export default function DashboardPage() {
                             <div className={`w-full h-8 rounded mb-1 shadow-sm ${t.colorClass}`}></div>
                             <span className="font-medium text-gray-700">{t.label}</span>
                             
-                            {/* Ícone de Cadeado ou Check */}
                             {locked && <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]"><FaLock className="text-white drop-shadow-md"/></div>}
                             {pageData?.theme === t.name && <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5 text-[8px]"><FaCheck/></div>}
                         </button>
