@@ -13,7 +13,7 @@ import {
 } from '@/lib/pageService';
 import { 
   FaUserCog, FaImage, FaSave, FaQrcode, FaTag, FaTrashAlt,
-  FaUtensils, FaPlus, FaTrash, FaCamera, FaCopy, FaExternalLinkAlt, FaLock, FaMapMarkerAlt, FaStore, FaDoorOpen, FaDoorClosed, FaWhatsapp, FaKey, FaClock, FaUsers, FaSearch
+  FaUtensils, FaPlus, FaTrash, FaCamera, FaCopy, FaExternalLinkAlt, FaLock, FaMapMarkerAlt, FaStore, FaDoorOpen, FaDoorClosed, FaWhatsapp, FaKey, FaClock, FaUsers, FaSearch, FaCheck
 } from 'react-icons/fa';
 import Image from 'next/image';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -21,7 +21,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 import { SortableLinkItem } from '@/components/SortableLinkItem';
 import { QRCodeCanvas } from 'qrcode.react';
 import FiscalModal from '@/components/FiscalModal';
-import { UpgradeModal } from '@/components/UpgradeModal'; // <--- IMPORTANTE
+import { UpgradeModal } from '@/components/UpgradeModal';
 
 // Pega chaves do .env ou usa string vazia para não quebrar
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || ""; 
@@ -49,7 +49,7 @@ export default function DashboardPage() {
   
   const [isProcessing, setIsProcessing] = useState(false); 
   const [isFiscalModalOpen, setIsFiscalModalOpen] = useState(false);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false); // <--- ESTADO DO MODAL MANUAL
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   // Campos do Prato
   const [newItemTitle, setNewItemTitle] = useState('');
@@ -106,10 +106,9 @@ export default function DashboardPage() {
 
   // --- LÓGICA DE ASSINATURA MANUAL ---
   const handleSubscribeClick = () => {
-    setIsUpgradeModalOpen(true); // Abre o Modal de Pix
+    setIsUpgradeModalOpen(true); 
   };
 
-  // Mantido caso precise salvar CPF depois
   const saveFiscalDataAndSubscribe = async (cpf: string, phone: string) => {
     if (!user) return;
     setIsFiscalModalOpen(false);
@@ -386,8 +385,7 @@ export default function DashboardPage() {
             </div>
         )}
 
-        {/* ... (PERFIL, DIVULGAÇÃO, ETC - Tudo mantido igual) ... */}
-        
+        {/* PERFIL */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-start">
             <div className="flex flex-col items-center gap-3 shrink-0">
                 <div className="relative w-24 h-24">
@@ -419,6 +417,7 @@ export default function DashboardPage() {
             </div>
         </div>
 
+        {/* DIVULGAÇÃO */}
         {pageSlug && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><FaQrcode className="text-orange-500" /> Divulgação</h3>
@@ -453,6 +452,7 @@ export default function DashboardPage() {
             </div>
         )}
 
+        {/* CUPONS */}
         <div className={`bg-white p-6 rounded-xl shadow-sm border border-gray-100 ${!isProPlan ? 'opacity-70 pointer-events-none grayscale' : ''}`}>
              <div className="flex justify-between items-center mb-4">
                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><FaTag className="text-purple-500" /> Cupons de Desconto</h3>
@@ -500,6 +500,7 @@ export default function DashboardPage() {
              </div>
         </div>
 
+        {/* NOVO PRATO */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="font-bold text-gray-800 mb-4 flex gap-2 items-center">
                 <FaPlus className="text-green-500"/> Novo Prato
@@ -526,6 +527,7 @@ export default function DashboardPage() {
             </form>
         </div>
 
+        {/* LISTA DE PRATOS */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="font-bold text-gray-800 mb-4">Cardápio Atual</h3>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -572,6 +574,7 @@ export default function DashboardPage() {
             </DndContext>
         </div>
 
+        {/* TEMAS */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8">
              <h3 className="font-bold text-gray-800 mb-4">Aparência & Temas</h3>
              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -598,17 +601,30 @@ export default function DashboardPage() {
                 {themes.map(t => {
                     const locked = t.isPro && !isProPlan;
                     return (
-                        <button key={t.name} onClick={() => { if(!locked) { updatePageTheme(pageSlug!, t.name); setPageData(prev => prev ? {...prev, theme: t.name} : null); }}} 
-                                className={`p-2 border rounded text-center text-xs relative overflow-hidden ${pageData?.theme === t.name ? 'border-orange-500 bg-orange-50' : ''} ${locked ? 'opacity-60 bg-gray-100' : ''}`}>
-                            <div className={`w-full h-6 rounded mb-1 ${t.colorClass}`}></div>
-                            {t.label}
-                            {locked && <div className="absolute inset-0 flex items-center justify-center bg-black/10"><FaLock className="text-white drop-shadow"/></div>}
+                        <button 
+                            key={t.name} 
+                            onClick={() => { 
+                                if (locked) {
+                                    alert("Este tema é exclusivo do Plano Pro! Assine para desbloquear.");
+                                    return;
+                                }
+                                handleThemeChange(t.name); 
+                            }} 
+                            className={`p-2 border rounded text-center text-xs relative overflow-hidden transition-all active:scale-95 ${pageData?.theme === t.name ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' : 'border-gray-200 hover:border-orange-300'} ${locked ? 'opacity-60 bg-gray-100 cursor-not-allowed' : ''}`}
+                        >
+                            <div className={`w-full h-8 rounded mb-1 shadow-sm ${t.colorClass}`}></div>
+                            <span className="font-medium text-gray-700">{t.label}</span>
+                            
+                            {/* Ícone de Cadeado ou Check */}
+                            {locked && <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]"><FaLock className="text-white drop-shadow-md"/></div>}
+                            {pageData?.theme === t.name && <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5 text-[8px]"><FaCheck/></div>}
                         </button>
                     )
                 })}
              </div>
         </div>
 
+        {/* ADMIN: LISTA DE USUÁRIOS */}
         {isAdmin && (
             <div className="bg-gray-800 text-white p-6 rounded-xl border border-gray-700 mt-10">
                 <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><FaUsers/> Base de Usuários</h3>
