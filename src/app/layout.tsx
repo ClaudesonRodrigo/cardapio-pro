@@ -1,21 +1,25 @@
 // src/app/layout.tsx
 
 import type { Metadata, Viewport } from "next";
-// 1. Trocamos Geist por Poppins
-import { Poppins } from "next/font/google"; 
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 
-// 2. Configuração da Fonte Poppins (Pesos: 400=Normal, 500=Médio, 700=Negrito)
-const poppins = Poppins({
-  variable: "--font-poppins",
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Cardápio Digital Pro",
+  // --- CONFIGURAÇÃO DO DOMÍNIO OFICIAL ---
+  metadataBase: new URL('https://www.cardapiocerto.com.br'), //
+
+  title: "Cardápio Certo - Seu Pedido Digital",
   description: "Crie seu Cardápio personalizado e compartilhe com seus Clientes.",
   manifest: "/manifest.json",
   icons: {
@@ -24,7 +28,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Cardápio Pro",
+    title: "Cardápio Certo",
   },
 };
 
@@ -40,8 +44,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body
-        // 3. Aplicamos a variável da Poppins aqui
-        className={`${poppins.variable} font-sans antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
           {children}
