@@ -11,10 +11,13 @@ import {
   getAllUsers, 
   PageData, LinkData, UserData, CouponData, findUserByEmail, updateUserPlan
 } from '@/lib/pageService';
+// 1. IMPORTANDO LUCIDE (Ícones Modernos)
 import { 
-  FaUserCog, FaImage, FaSave, FaQrcode, FaTag, FaTrashAlt,
-  FaUtensils, FaPlus, FaTrash, FaCamera, FaCopy, FaExternalLinkAlt, FaLock, FaMapMarkerAlt, FaStore, FaDoorOpen, FaDoorClosed, FaWhatsapp, FaKey, FaClock, FaUsers, FaSearch, FaCheck
-} from 'react-icons/fa';
+  Settings, Image as ImageIcon, Save, QrCode, Tag, Trash2,
+  UtensilsCrossed, PlusCircle, Camera, Copy, ExternalLink, Lock, MapPin, 
+  Store, DoorOpen, DoorClosed, MessageCircle, Key, Clock, Users, Search, Check, LogOut
+} from 'lucide-react';
+
 import Image from 'next/image';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -328,9 +331,6 @@ export default function DashboardPage() {
       let newTheme = themeName;
       let newColor = customColor;
 
-      // LÓGICA DE DESMARCAR (Toggle)
-      // Se eu clicar no tema que JÁ está ativo (e não for o personalizado), 
-      // eu limpo a seleção (newTheme = ''), o que remove o checkmark e volta pro padrão.
       if (pageData?.theme === themeName && themeName !== 'custom') {
           newTheme = ''; 
       }
@@ -367,7 +367,7 @@ export default function DashboardPage() {
   if (loading || (!isAdmin && isLoadingData)) return <div className="flex items-center justify-center min-h-screen">Carregando...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans relative">
+    <div className="min-h-screen bg-theme-bg pb-20 font-sans relative text-theme-text transition-colors duration-300">
       
       <UpgradeModal 
         isOpen={isUpgradeModalOpen} 
@@ -382,84 +382,93 @@ export default function DashboardPage() {
 
       <nav className="bg-white shadow-sm sticky top-0 z-20">
          <div className="max-w-4xl mx-auto px-4 h-16 flex justify-between items-center">
-            <h1 className="font-bold text-gray-800 flex gap-2 items-center"><FaUtensils className="text-orange-500"/> Gestor de Cardápio</h1>
-            <button onClick={() => signOut()} className="text-red-500 text-sm font-medium">Sair</button>
+            <h1 className="font-bold text-gray-800 flex gap-2 items-center"><UtensilsCrossed className="text-orange-500" size={24} /> Gestor de Cardápio</h1>
+            <button onClick={() => signOut()} className="text-red-500 text-sm font-medium flex items-center gap-1"><LogOut size={16}/> Sair</button>
          </div>
       </nav>
 
       <main className="max-w-4xl mx-auto py-8 px-4 space-y-6">
         
-        {/* BANNER TRIAL */}
-        {daysLeft !== null && (
-            <div className={`p-4 rounded-xl flex items-center justify-between shadow-sm ${daysLeft > 0 ? 'bg-yellow-100 border border-yellow-300 text-yellow-800' : 'bg-red-100 border border-red-300 text-red-800'}`}>
+        {/* CORREÇÃO: Banner de Assinatura Sempre Visível se não for Pro (ou se estiver em trial) */}
+        {(!isProPlan || (daysLeft !== null && daysLeft >= 0)) && (
+            <div className={`p-4 rounded-xl flex items-center justify-between shadow-sm border ${isProPlan ? 'bg-yellow-50 border-yellow-200' : 'bg-orange-50 border-orange-200'}`}>
                 <div className="flex items-center gap-3">
-                    <div className="bg-white p-2 rounded-full"><FaClock /></div>
+                    <div className={`p-2 rounded-full ${isProPlan ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-600'}`}>
+                        {isProPlan ? <Clock size={20} /> : <Lock size={20} />}
+                    </div>
                     <div>
-                        <p className="font-bold text-sm">{daysLeft > 0 ? `Período de Teste Pro: Restam ${daysLeft} dias.` : 'Seu período de teste acabou.'}</p>
-                        <p className="text-xs opacity-80">{daysLeft > 0 ? 'Aproveite todos os recursos liberados!' : 'Seus recursos Pro foram bloqueados. Assine para continuar.'}</p>
+                        <p className="font-bold text-sm text-gray-800">
+                            {isProPlan 
+                                ? `Período de Teste: Restam ${daysLeft} dias` 
+                                : 'Você está no Plano Grátis'}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                            {isProPlan 
+                                ? 'Aproveite todas as funções liberadas.' 
+                                : 'Desbloqueie Pix, Cupons, Cores e Produtos Ilimitados.'}
+                        </p>
                     </div>
                 </div>
                 <button 
-                    onClick={handleSubscribeClick}
+                    onClick={handleSubscribeClick} // Esse botão abre o Pix
                     disabled={isProcessing}
-                    className="bg-black text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-800 disabled:opacity-50"
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md transition transform active:scale-95"
                 >
-                    {isProcessing ? 'Processando...' : 'Assinar Agora'}
+                    {isProPlan ? 'Assinar Definitivo' : 'Quero ser PRO'}
                 </button>
             </div>
         )}
-
         {/* PERFIL */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-start">
             <div className="flex flex-col items-center gap-3 shrink-0">
                 <div className="relative w-24 h-24">
                     <div className="w-full h-full rounded-full overflow-hidden border-4 border-orange-100 relative bg-gray-100">
-                        {pageData?.profileImageUrl ? <Image src={pageData.profileImageUrl} alt="Logo" fill className="object-cover" sizes="96px" /> : <FaCamera className="text-gray-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8"/>}
+                        {pageData?.profileImageUrl ? <Image src={pageData.profileImageUrl} alt="Logo" fill className="object-cover" sizes="96px" /> : <Camera className="text-gray-300 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8"/>}
                     </div>
-                    <label className="absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full cursor-pointer hover:bg-orange-600 shadow"><FaCamera size={12}/><input type="file" className="hidden" onChange={handleProfileUpload} disabled={isUploadingProfile}/></label>
+                    <label className="absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full cursor-pointer hover:bg-orange-600 shadow"><Camera size={12}/><input type="file" className="hidden" onChange={handleProfileUpload} disabled={isUploadingProfile}/></label>
                 </div>
-                <button onClick={() => setIsOpenStore(!isOpenStore)} className={`w-full py-1.5 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1 transition-colors ${isOpenStore ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{isOpenStore ? <><FaDoorOpen/> Aberto</> : <><FaDoorClosed/> Fechado</>}</button>
+                <button onClick={() => setIsOpenStore(!isOpenStore)} className={`w-full py-1.5 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1 transition-colors ${isOpenStore ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>{isOpenStore ? <><DoorOpen size={14}/> Aberto</> : <><DoorClosed size={14}/> Fechado</>}</button>
             </div>
             <div className="flex-1 w-full space-y-3">
                 <input type="text" value={editingProfileTitle} onChange={e => setEditingProfileTitle(e.target.value)} className="w-full text-lg font-bold border-b border-gray-300 focus:border-orange-500 outline-none" placeholder="Nome do Restaurante" />
                 <textarea value={editingProfileBio} onChange={e => setEditingProfileBio(e.target.value)} className="w-full text-sm border rounded p-2 focus:border-orange-500 outline-none resize-none" rows={2} placeholder="Descrição / Horário de Funcionamento" />
                 <div className="flex items-center border rounded-lg overflow-hidden bg-white border-gray-300 focus-within:border-green-500 transition-all">
-                    <div className="bg-gray-100 px-3 py-2 border-r border-gray-200 flex items-center gap-1 text-gray-500 font-bold text-sm shrink-0"><FaWhatsapp className="text-green-500" /> +55</div>
+                    <div className="bg-gray-100 px-3 py-2 border-r border-gray-200 flex items-center gap-1 text-gray-500 font-bold text-sm shrink-0"><MessageCircle className="text-green-500" size={16} /> +55</div>
                     <input type="tel" value={editingProfileWhatsapp} onChange={e => setEditingProfileWhatsapp(e.target.value.replace(/\D/g, ''))} className="w-full text-sm bg-transparent outline-none px-3 py-2" placeholder="DDD + Número (WhatsApp)" maxLength={11} />
                 </div>
                 <div className={`flex items-center gap-2 border rounded p-2 transition-colors ${isProPlan ? 'bg-gray-50 focus-within:border-blue-500 focus-within:bg-white' : 'bg-gray-100 opacity-60 cursor-not-allowed'}`}>
-                    <FaKey className="text-blue-500" />
+                    <Key className="text-blue-500" size={16} />
                     <input type="text" value={editingProfilePix} onChange={e => setEditingProfilePix(e.target.value)} className={`w-full text-sm bg-transparent outline-none ${!isProPlan ? 'cursor-not-allowed' : ''}`} placeholder={isProPlan ? "Chave Pix (CPF, Email, Telefone)" : "Chave Pix (Recurso Pro)"} disabled={!isProPlan}/>
-                    {!isProPlan && <FaLock className="text-gray-400" />}
+                    {!isProPlan && <Lock className="text-gray-400" size={14} />}
                 </div>
                 <div className={`flex items-center gap-2 border rounded p-2 ${isProPlan ? 'bg-gray-50' : 'bg-gray-100 opacity-60 cursor-not-allowed'}`}>
-                    <FaMapMarkerAlt className="text-gray-400" />
+                    <MapPin className="text-gray-400" size={16} />
                     <input type="text" value={editingProfileAddress} onChange={e => setEditingProfileAddress(e.target.value)} className={`w-full text-sm bg-transparent outline-none ${!isProPlan ? 'cursor-not-allowed' : ''}`} placeholder={isProPlan ? "Endereço Completo" : "Endereço (Recurso Pro)"} disabled={!isProPlan} />
-                    {!isProPlan && <FaLock className="text-gray-400" />}
+                    {!isProPlan && <Lock className="text-gray-400" size={14} />}
                 </div>
-                <button onClick={handleSaveProfile} className="bg-orange-600 text-white px-4 py-2 rounded text-sm font-bold flex gap-2 hover:bg-orange-700 transition w-fit"><FaSave/> Salvar Dados</button>
+                <button onClick={handleSaveProfile} className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-bold flex gap-2 hover:bg-orange-700 transition w-fit items-center"><Save size={16}/> Salvar Dados</button>
             </div>
         </div>
 
         {/* DIVULGAÇÃO */}
         {pageSlug && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><FaQrcode className="text-orange-500" /> Divulgação</h3>
+                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><QrCode className="text-orange-500" size={20} /> Divulgação</h3>
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1 bg-orange-50 border border-orange-200 p-4 rounded-xl flex flex-col justify-center">
                         <label className="text-orange-800 text-xs font-bold uppercase mb-2">Link do Cardápio</label>
                         <div className="flex gap-2">
                             <div className="flex-1 bg-white border border-orange-200 rounded px-3 py-2 text-sm text-gray-600 truncate flex items-center">{typeof window !== 'undefined' ? window.location.origin : ''}/{pageSlug}</div>
-                            <button onClick={handleCopyUrl} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded font-bold text-sm transition flex items-center gap-2"><FaCopy /> {copyButtonText}</button>
+                            <button onClick={handleCopyUrl} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded font-bold text-sm transition flex items-center gap-2"><Copy size={16} /> {copyButtonText}</button>
                         </div>
                     </div>
                     <div className="flex gap-2">
                         <button onClick={() => isProPlan ? setShowQRCode(!showQRCode) : alert("QR Code é um recurso do plano Profissional.")} className={`${isProPlan ? 'bg-gray-800 hover:bg-gray-900' : 'bg-gray-400 cursor-not-allowed'} text-white px-4 rounded-xl font-bold flex flex-col items-center justify-center gap-1 min-w-[100px] transition py-3 relative`}>
-                            <FaQrcode size={20} /> <span className="text-xs">{showQRCode ? 'Fechar' : 'QR Code'}</span>
-                            {!isProPlan && <div className="absolute top-2 right-2"><FaLock size={10} /></div>}
+                            <QrCode size={20} /> <span className="text-xs">{showQRCode ? 'Fechar' : 'QR Code'}</span>
+                            {!isProPlan && <div className="absolute top-2 right-2"><Lock size={10} /></div>}
                         </button>
                         <a href={`/${pageSlug}`} target="_blank" className="bg-white border-2 border-gray-200 hover:border-gray-400 text-gray-700 px-4 rounded-xl font-bold flex flex-col items-center justify-center gap-1 min-w-[100px] transition py-3">
-                            <FaExternalLinkAlt size={18} /><span className="text-xs">Abrir</span>
+                            <ExternalLink size={18} /><span className="text-xs">Abrir</span>
                         </a>
                     </div>
                 </div>
@@ -479,8 +488,8 @@ export default function DashboardPage() {
         {/* CUPONS */}
         <div className={`bg-white p-6 rounded-xl shadow-sm border border-gray-100 ${!isProPlan ? 'opacity-70 pointer-events-none grayscale' : ''}`}>
              <div className="flex justify-between items-center mb-4">
-                 <h3 className="font-bold text-gray-800 flex items-center gap-2"><FaTag className="text-purple-500" /> Cupons de Desconto</h3>
-                 {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full flex items-center gap-1 font-bold"><FaLock size={10}/> Recurso Pro</span>}
+                 <h3 className="font-bold text-gray-800 flex items-center gap-2"><Tag className="text-purple-500" size={20} /> Cupons de Desconto</h3>
+                 {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full flex items-center gap-1 font-bold"><Lock size={10}/> Recurso Pro</span>}
              </div>
              <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-purple-50 rounded-xl border border-purple-100">
                  <div className="flex-1">
@@ -507,13 +516,13 @@ export default function DashboardPage() {
                      pageData.coupons.map((coupon, idx) => (
                          <div key={idx} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm">
                              <div className="flex items-center gap-3">
-                                 <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center font-bold text-lg"><FaTag/></div>
+                                 <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center font-bold text-lg"><Tag size={16}/></div>
                                  <div>
                                      <p className="font-bold text-gray-800">{coupon.code}</p>
                                      <p className="text-xs text-gray-500">{coupon.type === 'percent' ? `${coupon.value}% OFF` : `R$ ${coupon.value.toFixed(2)} OFF`}</p>
                                  </div>
                              </div>
-                             <button onClick={() => handleDeleteCoupon(coupon.code)} className="text-red-400 hover:text-red-600 p-2"><FaTrashAlt/></button>
+                             <button onClick={() => handleDeleteCoupon(coupon.code)} className="text-red-400 hover:text-red-600 p-2"><Trash2 size={16}/></button>
                          </div>
                      ))
                  ) : (
@@ -525,13 +534,13 @@ export default function DashboardPage() {
         {/* NOVO PRATO */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="font-bold text-gray-800 mb-4 flex gap-2 items-center">
-                <FaPlus className="text-green-500"/> Novo Prato
+                <PlusCircle className="text-green-500" size={20}/> Novo Prato
                 {!isProPlan && <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded ml-auto">Free: {(pageData?.links?.length || 0)}/8</span>}
             </h3>
             <form onSubmit={handleAddItem} className="space-y-4">
                 <div className="flex flex-col sm:flex-row gap-4 items-start">
                     <div className="w-20 h-20 bg-gray-50 rounded border-2 border-dashed border-gray-300 flex items-center justify-center relative cursor-pointer hover:bg-gray-100 group shrink-0">
-                        {newItemImage ? <Image src={newItemImage} alt="Prato" fill className="object-cover rounded" sizes="80px" /> : <FaCamera className="text-gray-400"/>}
+                        {newItemImage ? <Image src={newItemImage} alt="Prato" fill className="object-cover rounded" sizes="80px" /> : <Camera className="text-gray-400"/>}
                         <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleItemImageUpload(e, true)} disabled={isUploadingItemImg} />
                         {isUploadingItemImg && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><div className="animate-spin w-4 h-4 border-2 border-orange-500 rounded-full border-t-transparent"/></div>}
                     </div>
@@ -562,7 +571,7 @@ export default function DashboardPage() {
                                         <p className="text-xs font-bold text-orange-800 uppercase">Editando: {link.title}</p>
                                         <div className="flex gap-3">
                                             <div className="w-16 h-16 bg-white rounded relative border border-gray-200 shrink-0">
-                                                {editItemImage ? <Image src={editItemImage} alt="Img" fill className="object-cover rounded" sizes="64px"/> : <div className="w-full h-full flex items-center justify-center text-gray-300"><FaImage/></div>}
+                                                {editItemImage ? <Image src={editItemImage} alt="Img" fill className="object-cover rounded" sizes="64px"/> : <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageIcon size={20} /></div>}
                                                 <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleItemImageUpload(e, false)} />
                                             </div>
                                             <div className="flex-1 space-y-2">
@@ -596,15 +605,15 @@ export default function DashboardPage() {
             </DndContext>
         </div>
 
-        {/* APARÊNCIA & TEMAS (ATUALIZADO COM COLOR PICKER) */}
+        {/* APARÊNCIA & TEMAS */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8">
              <h3 className="font-bold text-gray-800 mb-4">Aparência & Temas</h3>
              
              {/* IMAGEM DE FUNDO (Capa) */}
              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
                  <label className="text-sm font-bold text-gray-700 mb-2 block items-center gap-2">
-                    <FaImage /> Imagem de Fundo (Capa)
-                    {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 rounded-full flex items-center gap-1"><FaLock size={10}/> Pro</span>}
+                    <ImageIcon size={16} /> Imagem de Fundo (Capa)
+                    {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 rounded-full flex items-center gap-1"><Lock size={10}/> Pro</span>}
                  </label>
                  <div className="flex items-center gap-4">
                     {pageData?.backgroundImage ? (
@@ -613,7 +622,7 @@ export default function DashboardPage() {
                                 <Image src={pageData.backgroundImage} alt="Bg" fill className="object-cover" sizes="96px" />
                             </div>
                             <button onClick={handleRemoveBg} className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded transition" title="Remover Imagem">
-                                <FaTrashAlt size={14} />
+                                <Trash2 size={14} />
                             </button>
                         </div>
                     ) : (
@@ -628,7 +637,7 @@ export default function DashboardPage() {
              
              {/* SELETOR DE TEMAS */}
              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {/* 1. Botão Personalizado (Color Picker) */}
+                {/* 1. Botão Personalizado */}
                 <div className={`p-2 border rounded text-center text-xs relative overflow-hidden transition-all ${pageData?.theme === 'custom' ? 'border-orange-500 bg-orange-50 ring-2 ring-orange-200' : 'border-gray-200 hover:border-orange-300'} ${!isProPlan ? 'opacity-60 cursor-not-allowed' : ''}`}>
                     <div className="w-full h-8 rounded mb-1 shadow-sm bg-linear-to-r from-pink-500 via-red-500 to-yellow-500 relative flex items-center justify-center">
                         {isProPlan && (
@@ -641,8 +650,8 @@ export default function DashboardPage() {
                         )}
                     </div>
                     <span className="font-medium text-gray-700">Cor Própria</span>
-                    {!isProPlan && <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]"><FaLock className="text-white drop-shadow-md"/></div>}
-                    {pageData?.theme === 'custom' && <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5 text-[8px]"><FaCheck/></div>}
+                    {!isProPlan && <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]"><Lock className="text-white drop-shadow-md" size={12} /></div>}
+                    {pageData?.theme === 'custom' && <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5"><Check size={8} /></div>}
                 </div>
 
                 {/* 2. Temas Padrão */}
@@ -663,8 +672,8 @@ export default function DashboardPage() {
                             <div className={`w-full h-8 rounded mb-1 shadow-sm ${t.colorClass}`}></div>
                             <span className="font-medium text-gray-700">{t.label}</span>
                             
-                            {locked && <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]"><FaLock className="text-white drop-shadow-md"/></div>}
-                            {pageData?.theme === t.name && <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5 text-[8px]"><FaCheck/></div>}
+                            {locked && <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]"><Lock className="text-white drop-shadow-md" size={12}/></div>}
+                            {pageData?.theme === t.name && <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5"><Check size={8} /></div>}
                         </button>
                     )
                 })}
@@ -674,7 +683,7 @@ export default function DashboardPage() {
         {/* ADMIN: LISTA DE USUÁRIOS */}
         {isAdmin && (
             <div className="bg-gray-800 text-white p-6 rounded-xl border border-gray-700 mt-10">
-                <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><FaUsers/> Base de Usuários</h3>
+                <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><Users size={20}/> Base de Usuários</h3>
                 
                 <div className="bg-gray-700 rounded-xl overflow-hidden mb-6">
                     <table className="w-full text-sm text-left">
@@ -712,10 +721,10 @@ export default function DashboardPage() {
                     {allUsers.length === 0 && <p className="p-4 text-center text-gray-400">Carregando usuários...</p>}
                 </div>
 
-                <h4 className="font-bold text-sm mb-2 text-gray-400 flex items-center gap-2"><FaUserCog/> Busca Individual</h4>
+                <h4 className="font-bold text-sm mb-2 text-gray-400 flex items-center gap-2"><Settings size={16}/> Busca Individual</h4>
                 <form onSubmit={handleSearchUser} className="flex gap-2 mb-4">
                     <input type="email" value={searchEmail} onChange={e => setSearchEmail(e.target.value)} className="flex-1 p-2 rounded border border-gray-600 bg-gray-700 text-white outline-none" placeholder="Buscar por email específico..." />
-                    <button className="bg-orange-600 text-white px-4 rounded font-bold hover:bg-orange-700"><FaSearch/></button>
+                    <button className="bg-orange-600 text-white px-4 rounded font-bold hover:bg-orange-700"><Search size={16}/></button>
                 </form>
                 {foundUser && (
                     <div className="bg-gray-900 p-4 rounded border border-gray-600">
@@ -740,7 +749,7 @@ export default function DashboardPage() {
         rel="noopener noreferrer"
         className="fixed bottom-5 right-5 z-50 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-full shadow-xl flex items-center gap-2 transition-transform transform hover:scale-105 font-bold animate-in fade-in zoom-in"
       >
-        <FaWhatsapp size={24} />
+        <MessageCircle size={24} />
         <span className="hidden md:block">Suporte</span>
       </a>
 
