@@ -11,7 +11,7 @@ import {
   getAllUsers, 
   PageData, LinkData, UserData, CouponData, findUserByEmail, updateUserPlan
 } from '@/lib/pageService';
-// 1. IMPORTANDO LUCIDE (Ícones Modernos)
+// ÍCONES MODERNOS (Lucide)
 import { 
   Settings, Image as ImageIcon, Save, QrCode, Tag, Trash2,
   UtensilsCrossed, PlusCircle, Camera, Copy, ExternalLink, Lock, MapPin, 
@@ -389,7 +389,7 @@ export default function DashboardPage() {
 
       <main className="max-w-4xl mx-auto py-8 px-4 space-y-6">
         
-        {/* CORREÇÃO: Banner de Assinatura Sempre Visível se não for Pro (ou se estiver em trial) */}
+        {/* Banner de Assinatura Sempre Visível se não for Pro (ou se estiver em trial) */}
         {(!isProPlan || (daysLeft !== null && daysLeft >= 0)) && (
             <div className={`p-4 rounded-xl flex items-center justify-between shadow-sm border ${isProPlan ? 'bg-yellow-50 border-yellow-200' : 'bg-orange-50 border-orange-200'}`}>
                 <div className="flex items-center gap-3">
@@ -410,7 +410,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 <button 
-                    onClick={handleSubscribeClick} // Esse botão abre o Pix
+                    onClick={handleSubscribeClick} 
                     disabled={isProcessing}
                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md transition transform active:scale-95"
                 >
@@ -418,6 +418,7 @@ export default function DashboardPage() {
                 </button>
             </div>
         )}
+
         {/* PERFIL */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-start">
             <div className="flex flex-col items-center gap-3 shrink-0">
@@ -547,7 +548,13 @@ export default function DashboardPage() {
                     <div className="flex-1 space-y-3 w-full">
                         <div className="flex gap-3">
                             <input className="flex-1 border p-2 rounded text-sm outline-none focus:border-orange-500" placeholder="Nome do Prato" value={newItemTitle} onChange={e => setNewItemTitle(e.target.value)} required />
-                            <input className="w-24 border p-2 rounded text-sm outline-none focus:border-orange-500" placeholder="R$" value={newItemPrice} onChange={e => setNewItemPrice(e.target.value)} />
+                            {/* VALIDAÇÃO DE PREÇO AQUI */}
+                            <input 
+                                className="w-24 border p-2 rounded text-sm outline-none focus:border-orange-500" 
+                                placeholder="R$" 
+                                value={newItemPrice} 
+                                onChange={e => setNewItemPrice(e.target.value.replace(/[^0-9,.]/g, ''))} // <--- AQUI
+                            />
                         </div>
                         <input className="w-full border p-2 rounded text-sm outline-none focus:border-orange-500" placeholder="Categoria (Ex: Bebidas, Lanches)" value={newItemCat} onChange={e => setNewItemCat(e.target.value)} list="categories-list" />
                         <datalist id="categories-list">{existingCategories.map((cat, i) => <option key={i} value={cat as string} />)}</datalist>
@@ -577,7 +584,13 @@ export default function DashboardPage() {
                                             <div className="flex-1 space-y-2">
                                                 <div className="flex gap-2">
                                                     <input className="flex-1 border p-1 rounded text-sm" value={editItemTitle} onChange={e => setEditItemTitle(e.target.value)} placeholder="Nome" />
-                                                    <input className="w-20 border p-1 rounded text-sm" value={editItemPrice} onChange={e => setEditItemPrice(e.target.value)} placeholder="Preço" />
+                                                    {/* VALIDAÇÃO DE EDIÇÃO AQUI */}
+                                                    <input 
+                                                        className="w-20 border p-1 rounded text-sm" 
+                                                        value={editItemPrice} 
+                                                        onChange={e => setEditItemPrice(e.target.value.replace(/[^0-9,.]/g, ''))} // <--- AQUI
+                                                        placeholder="Preço" 
+                                                    />
                                                 </div>
                                                 <input className="w-full border p-1 rounded text-sm" value={editItemCat} onChange={e => setEditItemCat(e.target.value)} placeholder="Categoria" list="categories-list" />
                                                 <input className="w-full border p-1 rounded text-sm" value={editItemDesc} onChange={e => setEditItemDesc(e.target.value)} placeholder="Descrição" />
