@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { FaWhatsapp, FaMapMarkerAlt, FaClock, FaExclamationCircle } from 'react-icons/fa';
 import ClientLinkItem from './ClientLinkItem';
 
-// Mapa de Temas (IGUAL AO DASHBOARD)
+// Mapa de Temas
 const themeMap: Record<string, string> = {
   restaurant: 'bg-red-900',
   light: 'bg-gray-100',
@@ -24,7 +24,7 @@ const getTextColors = (theme: string) => {
 };
 
 export default async function Page({ params }: { params: { slug: string } }) {
-  const { slug } = await Promise.resolve(params); // Next 15 safe access
+  const { slug } = await Promise.resolve(params); 
   const pageData = await getPageDataBySlug(slug);
 
   if (!pageData) {
@@ -78,10 +78,17 @@ export default async function Page({ params }: { params: { slug: string } }) {
                 ) : (
                     <span className="bg-green-500/90 text-white px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"><FaClock/> Aberto</span>
                 )}
+                
+                {/* 📍 BOTÃO DE LOCALIZAÇÃO (CORRIGIDO PARA ABRIR O MAPA) */}
                 {pageData.address && (
-                    <span className={`bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${colors.text}`}>
+                    <a 
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pageData.address)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${colors.text} hover:bg-white/30 transition cursor-pointer hover:scale-105 active:scale-95`}
+                    >
                         <FaMapMarkerAlt size={10}/> {pageData.address.split(',')[0]}
-                    </span>
+                    </a>
                 )}
             </div>
         </div>
