@@ -279,6 +279,18 @@ export default function DashboardPage() {
       setIsUploadingBg(false);
   };
 
+  const handleRemoveBg = async () => {
+      if (!pageSlug) return;
+      if (confirm("Deseja remover a imagem de fundo?")) {
+          try {
+             await updatePageBackground(pageSlug, ""); 
+             setPageData(prev => prev ? { ...prev, backgroundImage: "" } : null);
+          } catch (error) {
+             alert("Erro ao remover a imagem.");
+          }
+      }
+  };
+
   const handleSaveProfile = async () => {
       if(!pageSlug) return;
       if (!isProPlan) {
@@ -310,12 +322,22 @@ export default function DashboardPage() {
       setTimeout(() => setCopyButtonText("Copiar Link"), 2000);
   };
 
-  // Função atualizada para lidar com o Custom Theme
   const handleThemeChange = async (themeName: string, customColor?: string) => {
       if (!pageSlug) return;
+      
+      let newTheme = themeName;
+      let newColor = customColor;
+
+      // LÓGICA DE DESMARCAR (Toggle)
+      // Se eu clicar no tema que JÁ está ativo (e não for o personalizado), 
+      // eu limpo a seleção (newTheme = ''), o que remove o checkmark e volta pro padrão.
+      if (pageData?.theme === themeName && themeName !== 'custom') {
+          newTheme = ''; 
+      }
+
       try { 
-          await updatePageTheme(pageSlug, themeName, customColor); 
-          setPageData(prev => prev ? { ...prev, theme: themeName, customThemeColor: customColor } : null); 
+          await updatePageTheme(pageSlug, newTheme, newColor); 
+          setPageData(prev => prev ? { ...prev, theme: newTheme, customThemeColor: newColor } : null); 
       }
       catch { alert("Erro ao mudar tema."); }
   };
@@ -580,14 +602,19 @@ export default function DashboardPage() {
              
              {/* IMAGEM DE FUNDO (Capa) */}
              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                 <label className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+                 <label className="text-sm font-bold text-gray-700 mb-2 block items-center gap-2">
                     <FaImage /> Imagem de Fundo (Capa)
                     {!isProPlan && <span className="bg-gray-200 text-gray-500 text-xs px-2 rounded-full flex items-center gap-1"><FaLock size={10}/> Pro</span>}
                  </label>
                  <div className="flex items-center gap-4">
                     {pageData?.backgroundImage ? (
-                        <div className="w-24 h-14 relative rounded-md overflow-hidden border border-gray-300 shadow-sm">
-                            <Image src={pageData.backgroundImage} alt="Bg" fill className="object-cover" sizes="96px" />
+                        <div className="flex items-center gap-2">
+                            <div className="w-24 h-14 relative rounded-md overflow-hidden border border-gray-300 shadow-sm">
+                                <Image src={pageData.backgroundImage} alt="Bg" fill className="object-cover" sizes="96px" />
+                            </div>
+                            <button onClick={handleRemoveBg} className="bg-red-100 hover:bg-red-200 text-red-600 p-2 rounded transition" title="Remover Imagem">
+                                <FaTrashAlt size={14} />
+                            </button>
                         </div>
                     ) : (
                         <div className="w-24 h-14 bg-gray-200 rounded-md border border-gray-300 flex items-center justify-center text-xs text-gray-400">Sem Capa</div>
