@@ -3,22 +3,17 @@
 
 /* Tema Padrão (Light) - Aplicado ao :root (html) por padrão */
 :root {
-  --color-bg: #f3f4f6;
-  /* bg-gray-100 */
-  --color-text: #1f2937;
-  /* text-gray-800 */
-  --color-text-muted: #4b5563;
-  /* text-gray-600 */
+  --color-bg: #fafaf9; /* */
+  
+  --color-text: #1c1917; /* Stone 900 - Preto suave */
+  --color-text-muted: #57534e; /* Stone 600 */
+  
   --color-button-bg: #2563eb;
-  /* bg-blue-600 */
   --color-button-text: #ffffff;
-  /* text-white */
   --color-button-hover-bg: #1d4ed8;
-  /* hover:bg-blue-700 */
   --color-image-border: #ffffff;
-  /* border-white */
 
-  /* Variáveis padrão para gradientes (caso não sejam sobrescritas) */
+  /* Variáveis padrão para gradientes */
   --color-ocean-start: #1cb5e0;
   --color-ocean-end: #000046;
   --color-sunset-start: #ff7e5f;
