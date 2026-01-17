@@ -2,8 +2,30 @@
 'use client';
 
 import { CartProvider, useCart } from '@/context/CartContext';
-import { ShoppingBag, MessageCircle, X, Trash2, Copy, CheckCircle } from 'lucide-react';
+import { ShoppingBag, MessageCircle, X, Trash2, Copy, CheckCircle, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
+import confetti from 'canvas-confetti'; // <--- O EFEITO MÁGICO
+
+// --- FUNÇÃO DE CONFETES ---
+const triggerSuccessConfetti = () => {
+  const duration = 3 * 1000;
+  const animationEnd = Date.now() + duration;
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 999 };
+
+  const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+  const interval: any = setInterval(function() {
+    const timeLeft = animationEnd - Date.now();
+
+    if (timeLeft <= 0) {
+      return clearInterval(interval);
+    }
+
+    const particleCount = 50 * (timeLeft / duration);
+    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+  }, 250);
+};
 
 // --- MODAL DE CHECKOUT (SACOLA) ---
 function CartModal({ 
@@ -27,6 +49,9 @@ function CartModal({
   const handleFinish = () => {
     if (!whatsapp) return alert("Este restaurante não configurou o WhatsApp!");
 
+    // 1. Dispara os confetes antes de sair! 🎉
+    triggerSuccessConfetti();
+
     let message = `Olá *${restaurantName}*! Gostaria de fazer um pedido:\n\n`;
     cart.forEach(item => {
       message += `${item.quantity}x ${item.title} - R$ ${(item.price * item.quantity).toFixed(2)}\n`;
@@ -39,12 +64,10 @@ function CartModal({
     
     message += `\n\n(Enviado pelo Cardápio Digital)`;
 
-    // Abre o WhatsApp
-    window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
-    
-    // Opcional: Limpar carrinho após envio? Por enquanto não, pra ele ver o que pediu.
-    // clearCart(); 
-    // onClose();
+    // Delayzinho para o cliente ver a animação antes de mudar de app
+    setTimeout(() => {
+        window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
+    }, 800);
   };
 
   const handleCopyPix = () => {
@@ -85,7 +108,7 @@ function CartModal({
         {/* Área de Pagamento e Total */}
         <div className="p-5 bg-gray-50 border-t border-gray-200 space-y-4">
             
-            {/* PIX DO RESTAURANTE (Se tiver) */}
+            {/* PIX DO RESTAURANTE */}
             {pixKey && cart.length > 0 && (
                 <div className="bg-white border border-green-200 rounded-xl p-3 shadow-sm">
                     <p className="text-xs font-bold text-green-700 mb-2 flex items-center gap-1">
@@ -126,7 +149,7 @@ function CartModal({
   );
 }
 
-// --- BARRA FLUTUANTE ---
+// --- BARRA FLUTUANTE (GLASSMORPHISM) ---
 function FloatingCartBar({ 
     whatsapp, 
     restaurantName, 
@@ -143,27 +166,34 @@ function FloatingCartBar({
 
   return (
     <>
-        <div className="fixed bottom-4 left-4 right-4 z-50 animate-in slide-in-from-bottom-5">
-        <button 
-            onClick={() => setIsModalOpen(true)} // Abre o Modal em vez de mandar direto
-            className="w-full bg-green-600 text-white p-4 rounded-xl shadow-xl flex justify-between items-center hover:bg-green-700 transition active:scale-95 border border-green-500/50 backdrop-blur-md"
-        >
-            <div className="flex items-center gap-3">
-                <div className="bg-white/20 p-2.5 rounded-full relative">
-                    <ShoppingBag size={20} />
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                        {cart.reduce((a, b) => a + b.quantity, 0)}
-                    </span>
+        {/* Container com estilo "Vidro Fosco" (Glassmorphism) e Animação de Entrada */}
+        <div className="fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-10 duration-500">
+            <button 
+                onClick={() => setIsModalOpen(true)}
+                className="w-full group relative overflow-hidden bg-gray-900/85 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-2xl transition-all active:scale-[0.98] hover:bg-gray-900/95"
+            >
+                {/* Brilho interno */}
+                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"/>
+
+                <div className="flex justify-between items-center relative z-10">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-white/10 p-3 rounded-full relative">
+                            <ShoppingBag className="text-white" size={20} />
+                            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-lg border-2 border-gray-900">
+                                {cart.reduce((a, b) => a + b.quantity, 0)}
+                            </span>
+                        </div>
+                        <div className="text-left">
+                            <p className="text-xs text-gray-400 font-medium">Total estimado</p>
+                            <p className="text-white font-bold text-xl leading-none">R$ {total.toFixed(2)}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-green-900/20 group-hover:bg-green-500 transition">
+                        Ver Sacola <ArrowRight size={16}/>
+                    </div>
                 </div>
-                <div className="text-left">
-                    <p className="text-xs font-light opacity-90">Total (Ver Sacola)</p>
-                    <p className="font-bold text-lg leading-none">R$ {total.toFixed(2)}</p>
-                </div>
-            </div>
-            <div className="flex items-center gap-2 font-bold text-sm bg-black/20 px-4 py-2 rounded-lg">
-                Ver Sacola
-            </div>
-        </button>
+            </button>
         </div>
 
         <CartModal 
@@ -182,7 +212,7 @@ export default function CartWidget({
   children, 
   whatsapp, 
   restaurantName,
-  pixKey // Recebe a chave Pix
+  pixKey 
 }: { 
   children: React.ReactNode, 
   whatsapp?: string, 

@@ -5,7 +5,8 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import { Image as ImageIcon, Plus, Minus } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
-import { ProductDetailsModal } from '@/components/ProductDetailsModal'; // <--- Import novo
+import { ProductDetailsModal } from '@/components/ProductDetailsModal';
+import { motion } from 'framer-motion'; // <--- Import da animação
 
 interface LinkData {
   title: string;
@@ -26,7 +27,7 @@ interface Props {
 
 export default function ClientLinkItem({ link, cardClass, textClass, subClass }: Props) {
   const { addToCart, removeFromCart, cart } = useCart();
-  const [isModalOpen, setIsModalOpen] = useState(false); // Estado do Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const cartItem = cart.find(i => i.title === link.title);
   const quantity = cartItem ? cartItem.quantity : 0;
@@ -41,21 +42,25 @@ export default function ClientLinkItem({ link, cardClass, textClass, subClass }:
             product={link} 
         />
 
-        <div 
-            onClick={() => setIsModalOpen(true)} // Clicar no card abre o modal
-            className={`p-3 rounded-xl flex items-center gap-3 shadow-sm transition-all cursor-pointer ${cardClass} ${quantity > 0 ? 'ring-2 ring-green-500 bg-green-50/10' : ''}`}
+        <motion.div 
+            whileTap={{ scale: 0.98 }} // Efeito sutil ao clicar no card inteiro
+            onClick={() => setIsModalOpen(true)}
+            className={`p-3 rounded-xl flex items-center gap-3 shadow-sm transition-all cursor-pointer border border-transparent hover:border-black/5 ${cardClass} ${quantity > 0 ? 'ring-2 ring-green-500 bg-green-50/50' : ''}`}
         >
           {/* Imagem */}
-          <div className="w-20 h-20 bg-black/10 rounded-lg relative overflow-hidden shrink-0 border border-white/10">
+          <div className="w-20 h-20 bg-gray-100 rounded-lg relative overflow-hidden shrink-0 border border-black/5">
             {link.imageUrl ? (
                 <Image src={link.imageUrl} alt={link.title} fill className="object-cover" sizes="80px" />
             ) : (
-                <div className="w-full h-full flex items-center justify-center text-white/20"><ImageIcon size={20} /></div>
+                <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageIcon size={20} /></div>
             )}
             {quantity > 0 && (
-                <div className="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-bl-lg shadow">
+                <motion.div 
+                    initial={{ scale: 0 }} animate={{ scale: 1 }}
+                    className="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-bl-lg shadow-md z-10"
+                >
                     {quantity}
-                </div>
+                </motion.div>
             )}
           </div>
 
@@ -65,34 +70,41 @@ export default function ClientLinkItem({ link, cardClass, textClass, subClass }:
                 <div className="flex justify-between items-start">
                     <h4 className={`font-bold text-sm truncate leading-tight ${textClass}`}>{link.title}</h4>
                 </div>
-                {/* Descrição truncada visualmente, mas abre completa no modal */}
                 {link.description && <p className={`text-xs truncate mt-0.5 opacity-80 ${subClass}`}>{link.description}</p>}
             </div>
 
             <div className="flex justify-between items-end">
-                <span className="text-sm font-bold text-green-500">
-                    {hasPrice ? `R$ ${link.price}` : 'Consulte'}
+                <span className="text-sm font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-md border border-green-100">
+                    {hasPrice ? `R$ ${link.price}` : 'Ver'}
                 </span>
 
-                {/* CONTROLES (com stopPropagation para não abrir o modal ao clicar neles) */}
+                {/* CONTROLES (Stepper com animação) */}
                 {hasPrice && (
-                    <div className="flex items-center gap-3 bg-gray-100/10 rounded-lg p-1 backdrop-blur-sm border border-white/10" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-3 bg-white shadow-sm rounded-lg p-1 border border-gray-100" onClick={(e) => e.stopPropagation()}>
                         {quantity > 0 && (
                             <>
-                                <button onClick={() => removeFromCart(link.title)} className={`w-6 h-6 flex items-center justify-center rounded bg-white/10 hover:bg-red-500 hover:text-white transition ${textClass}`}>
+                                <motion.button 
+                                    whileTap={{ scale: 0.8 }}
+                                    onClick={() => removeFromCart(link.title)} 
+                                    className="w-7 h-7 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-500 transition"
+                                >
                                     <Minus size={14} />
-                                </button>
-                                <span className={`text-xs font-bold w-3 text-center ${textClass}`}>{quantity}</span>
+                                </motion.button>
+                                <span className="text-xs font-bold w-4 text-center text-gray-800">{quantity}</span>
                             </>
                         )}
-                        <button onClick={() => addToCart({ title: link.title, price: priceNumber })} className={`w-6 h-6 flex items-center justify-center rounded bg-green-600 text-white hover:bg-green-700 transition shadow-sm`}>
+                        <motion.button 
+                            whileTap={{ scale: 0.8, rotate: 90 }} // Gira e encolhe ao clicar!
+                            onClick={() => addToCart({ title: link.title, price: priceNumber })} 
+                            className="w-7 h-7 flex items-center justify-center rounded bg-green-500 text-white hover:bg-green-600 transition shadow-sm"
+                        >
                             <Plus size={14} />
-                        </button>
+                        </motion.button>
                     </div>
                 )}
             </div>
           </div>
-        </div>
+        </motion.div>
     </>
   );
 }
