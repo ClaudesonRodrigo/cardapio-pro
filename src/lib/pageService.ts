@@ -1,8 +1,8 @@
 // src/lib/pageService.ts
 
 import {
-  doc, getDoc, updateDoc, arrayUnion, arrayRemove, DocumentData,
-  collection, query, where, getDocs, orderBy, limit, Timestamp
+  doc, getDoc, updateDoc, arrayUnion, arrayRemove, addDoc, deleteDoc, DocumentData,
+  collection, query, where, getDocs, orderBy, limit, Timestamp, onSnapshot
 } from "firebase/firestore";
 import { db } from "./firebaseClient";
 
@@ -20,13 +20,29 @@ export type LinkData = {
   category?: string;
 };
 
-// Tipo Cupom
 export type CouponData = {
   code: string;       
   type: 'percent' | 'fixed'; 
   value: number;      
   minValue?: number;  
   active: boolean;    
+};
+
+export type OrderStatus = 'pending' | 'preparing' | 'delivery' | 'completed' | 'canceled';
+
+export type OrderData = {
+  id?: string;
+  pageSlug: string;
+  customerId?: string; 
+  customerName: string;
+  customerPhone?: string;
+  deliveryMethod: 'delivery' | 'pickup'; 
+  deliveryAddress?: string; 
+  items: any[];
+  total: number;
+  paymentMethod: string;
+  status: OrderStatus;
+  createdAt: any;
 };
 
 export type PageData = {
@@ -40,7 +56,7 @@ export type PageData = {
   links: LinkData[];
   coupons?: CouponData[]; 
   theme?: string;
-  customThemeColor?: string; // <--- NOVO CAMPO
+  customThemeColor?: string;
   userId: string;
   slug: string;
   plan?: string;
@@ -61,7 +77,7 @@ export type UserData = {
   createdAt?: any;    
 };
 
-// FUNÇÃO AUXILIAR
+// --- FUNÇÃO AUXILIAR ---
 const checkPlanValidity = (data: any) => {
     if (!data) return 'free';
     if (data.plan === 'pro' && data.trialDeadline) {
@@ -72,7 +88,102 @@ const checkPlanValidity = (data: any) => {
     return data.plan || 'free';
 };
 
-// --- LEITURA ---
+// --- FUNÇÕES DE PEDIDOS ---
+
+export const createOrder = async (order: OrderData): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, "orders"), {
+      ...order,
+      createdAt: Timestamp.now()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error("Erro ao criar pedido:", error);
+    throw error;
+  }
+};
+
+export const getOrdersBySlug = async (slug: string): Promise<OrderData[]> => {
+  try {
+    const q = query(
+      collection(db, "orders"), 
+      where("pageSlug", "==", slug),
+      orderBy("createdAt", "desc"),
+      limit(50)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OrderData));
+  } catch (error) {
+    console.error("Erro ao buscar pedidos:", error);
+    return [];
+  }
+};
+
+export const getOrderById = async (orderId: string): Promise<OrderData | null> => {
+  try {
+    const docRef = doc(db, "orders", orderId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() } as OrderData;
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+};
+
+export const updateOrderStatus = async (orderId: string, newStatus: OrderStatus): Promise<void> => {
+  const orderRef = doc(db, "orders", orderId);
+  await updateDoc(orderRef, { status: newStatus });
+};
+
+export const getOrdersByCustomerId = async (customerId: string): Promise<OrderData[]> => {
+  try {
+    const q = query(
+      collection(db, "orders"), 
+      where("customerId", "==", customerId),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OrderData));
+  } catch (error) {
+    console.error("Erro ao buscar histórico:", error);
+    return [];
+  }
+};
+
+export const getOrdersByDateRange = async (slug: string, startDate: Date, endDate: Date): Promise<OrderData[]> => {
+  try {
+    const startStr = startDate.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    const start = new Date(`${startStr}T00:00:00`);
+    const end = new Date(`${endStr}T23:59:59`);
+
+    const q = query(
+      collection(db, "orders"), 
+      where("pageSlug", "==", slug),
+      where("createdAt", ">=", Timestamp.fromDate(start)),
+      where("createdAt", "<=", Timestamp.fromDate(end)),
+      orderBy("createdAt", "desc")
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OrderData));
+
+  } catch (error: any) {
+    console.error("ERRO NO FILTRO FINANCEIRO:", error);
+    if (error.code === 'failed-precondition') {
+        alert("⚠️ ATENÇÃO DEV: Falta criar o índice no Firebase! Olhe o Console (F12) e clique no link.");
+        console.log("%c CLIQUE NESTE LINK PARA CRIAR O ÍNDICE: ", "background: red; color: white; font-size: 20px");
+    }
+    return [];
+  }
+};
+
+
+// --- FUNÇÕES DE LEITURA (PÁGINAS) ---
 
 export const getRecentPages = async (): Promise<PageData[]> => {
   try {
@@ -81,7 +192,6 @@ export const getRecentPages = async (): Promise<PageData[]> => {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => doc.data() as PageData);
   } catch (error) {
-    console.error("Erro ao buscar recentes:", error);
     return [];
   }
 };
@@ -103,10 +213,8 @@ export const getPageDataForUser = async (userId: string): Promise<{ slug: string
       if (!pagesSnap.empty) {
         const pageDoc = pagesSnap.docs[0];
         const pageData = pageDoc.data();
-        
         const sourceOfData = userData?.plan ? userData : pageData;
         const realPlan = checkPlanValidity(sourceOfData); 
-        
         return { slug: pageDoc.id, data: { ...pageData, plan: realPlan } };
       }
       return null;
@@ -123,7 +231,6 @@ export const getPageDataForUser = async (userId: string): Promise<{ slug: string
     }
     return null;
   } catch (error) {
-    console.error("Erro ao buscar dados:", error);
     return null;
   }
 };
@@ -149,7 +256,6 @@ export const getAllUsers = async (): Promise<(UserData & { uid: string, createdA
       ...(doc.data() as UserData)
     }));
   } catch (error) {
-    console.error("Erro ao listar usuários:", error);
     return [];
   }
 };
@@ -176,7 +282,6 @@ export const updatePageCoupons = async (pageSlug: string, coupons: CouponData[])
   await updateDoc(pageDocRef, { coupons });
 };
 
-// ATUALIZADO: Aceita cor personalizada
 export const updatePageTheme = async (pageSlug: string, theme: string, customColor?: string): Promise<void> => {
   const updateData: any = { theme };
   if (customColor) {
@@ -225,18 +330,56 @@ export const findUserByEmail = async (email: string): Promise<(UserData & { uid:
   return snapshot.empty ? null : { uid: snapshot.docs[0].id, ...(snapshot.docs[0].data() as UserData) };
 };
 
+// --- FUNÇÕES ADMIN (NOVAS) ---
+
+// Atualiza Plano (User e Page)
 export const updateUserPlan = async (userId: string, newPlan: 'free' | 'pro'): Promise<void> => {
-  await updateDoc(doc(db, "users", userId), { plan: newPlan, trialDeadline: null });
-  const pagesRef = collection(db, "pages");
-  const q = query(pagesRef, where("userId", "==", userId));
-  const snapshot = await getDocs(q);
-  if (!snapshot.empty) {
-      const pageId = snapshot.docs[0].id;
-      await updateDoc(doc(db, "pages", pageId), { plan: newPlan, trialDeadline: null });
+  try {
+      await updateDoc(doc(db, "users", userId), { plan: newPlan, trialDeadline: null });
+      const pagesRef = collection(db, "pages");
+      const q = query(pagesRef, where("userId", "==", userId));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+          const updates = snapshot.docs.map(pageDoc => updateDoc(doc(db, "pages", pageDoc.id), { plan: newPlan, trialDeadline: null }));
+          await Promise.all(updates);
+      }
+  } catch (error) {
+      console.error("Erro ao atualizar plano no Firebase:", error);
+      throw error;
   }
 };
 
 export const updateUserFiscalData = async (userId: string, cpfCnpj: string, phone: string): Promise<void> => {
   const userRef = doc(db, "users", userId);
   await updateDoc(userRef, { cpfCnpj, phone });
+};
+
+// Edição Simples de Usuário (Nome/Slug) - Admin
+export const adminUpdateUser = async (userId: string, newName: string): Promise<void> => {
+    // Nota: Alterar Slug é complexo pois é o ID do documento. Por segurança, só alteramos o Nome aqui.
+    await updateDoc(doc(db, "users", userId), { displayName: newName });
+};
+
+// Deletar Usuário e sua Página do Banco de Dados
+export const adminDeleteUserSystem = async (userId: string, pageSlug?: string): Promise<void> => {
+    try {
+        // 1. Deleta o doc de Usuário
+        await deleteDoc(doc(db, "users", userId));
+        
+        // 2. Se tiver página, deleta a página
+        if (pageSlug) {
+            await deleteDoc(doc(db, "pages", pageSlug));
+        } else {
+            // Tenta achar a página se não foi passada
+            const pagesRef = collection(db, "pages");
+            const q = query(pagesRef, where("userId", "==", userId));
+            const snapshot = await getDocs(q);
+            if(!snapshot.empty) {
+                await deleteDoc(doc(db, "pages", snapshot.docs[0].id));
+            }
+        }
+    } catch (error) {
+        console.error("Erro ao deletar usuário do sistema:", error);
+        throw error;
+    }
 };

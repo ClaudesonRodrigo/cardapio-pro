@@ -1,24 +1,18 @@
 // src/app/layout.tsx
-
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Poppins } from "next/font/google"; // <--- Trocamos para Poppins
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Configuração da Fonte Poppins
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"], // Pesos mais usados
 });
 
 export const metadata: Metadata = {
-  // --- CONFIGURAÇÃO DO DOMÍNIO OFICIAL ---
-  metadataBase: new URL('https://www.cardapiocerto.com.br'), //
-
+  metadataBase: new URL('https://www.cardapiocerto.com.br'),
   title: "Cardápio Certo - Seu Pedido Digital",
   description: "Crie seu Cardápio personalizado e compartilhe com seus Clientes.",
   manifest: "/manifest.json",
@@ -43,9 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${poppins.variable} font-sans antialiased bg-gray-50 text-gray-900`}>
         <AuthProvider>
           {children}
         </AuthProvider>
