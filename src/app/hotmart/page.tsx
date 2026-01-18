@@ -5,13 +5,13 @@ import React from 'react';
 import { 
   CheckCircle, Rocket, Smartphone, DollarSign, Layout, Shield, 
   ArrowRight, Star, Code, Database, Zap, Lock, BarChart3, 
-  ShoppingBag, MapPin, MousePointerClick, Eye, ExternalLink // <--- Novos ícones adicionados
+  ShoppingBag, MapPin, MousePointerClick, Eye, ExternalLink, PlayCircle 
 } from 'lucide-react';
 
 export default function HotmartSalesPage() {
   
-  // 👇 COLOQUE AQUI O SEU LINK DE CHECKOUT DA HOTMART (Produto de R$ 247,00)
-  const HOTMART_LINK = "SEU_LINK_DE_CHECKOUT_AQUI"; 
+  // 👇 LINK DEFINITIVO DO CHECKOUT HOTMART
+  const HOTMART_LINK = "https://pay.hotmart.com/K103943387F"; 
 
   const features = [
     { icon: Shield, title: "Painel Super Admin", desc: "Controle total. Crie, bloqueie e gerencie todos os restaurantes da plataforma em uma única tela." },
@@ -44,14 +44,14 @@ export default function HotmartSalesPage() {
             <div className="font-black text-2xl tracking-tighter flex items-center gap-2">
                 <span className="text-green-400">CODE</span>MARKET
             </div>
-            <a href={HOTMART_LINK} className="bg-green-500 hover:bg-green-400 text-black px-6 py-2.5 rounded-full font-bold text-sm transition shadow-lg shadow-green-500/20 flex items-center gap-2">
+            <a href={HOTMART_LINK} target="_blank" rel="noopener noreferrer" className="bg-green-500 hover:bg-green-400 text-black px-6 py-2.5 rounded-full font-bold text-sm transition shadow-lg shadow-green-500/20 flex items-center gap-2">
                 Comprar Agora <ArrowRight size={16}/>
             </a>
         </div>
       </nav>
 
       {/* HERO SECTION */}
-      <header className="pt-40 pb-20 px-6 text-center relative z-10">
+      <header className="pt-32 pb-10 px-6 text-center relative z-10">
           <div className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-10 duration-700 fade-in">
               
               <div className="inline-flex items-center gap-2 bg-white/5 text-green-400 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border border-white/10 hover:border-green-500/50 transition cursor-default">
@@ -67,19 +67,43 @@ export default function HotmartSalesPage() {
                   Adquira o <strong>Código Fonte White-Label</strong> de um sistema de pedidos validado. Instale, coloque sua marca e venda assinaturas para restaurantes da sua cidade.
               </p>
               
-              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-                  <a href={HOTMART_LINK} className="bg-green-500 text-black text-xl px-10 py-5 rounded-2xl font-black shadow-xl shadow-green-500/20 hover:bg-green-400 hover:scale-105 transition transform flex items-center justify-center gap-3">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+                  <a href={HOTMART_LINK} target="_blank" rel="noopener noreferrer" className="bg-green-500 text-black text-xl px-10 py-5 rounded-2xl font-black shadow-xl shadow-green-500/20 hover:bg-green-400 hover:scale-105 transition transform flex items-center justify-center gap-3">
                       <Code size={24}/> BAIXAR CÓDIGO FONTE
                   </a>
               </div>
               
-              <div className="pt-8 flex items-center justify-center gap-8 text-sm text-gray-500 font-medium">
+              <div className="pt-6 flex items-center justify-center gap-8 text-sm text-gray-500 font-medium">
                   <span className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500"/> Entrega Imediata</span>
                   <span className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500"/> Garantia de 7 Dias</span>
                   <span className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500"/> Vitalício</span>
               </div>
           </div>
       </header>
+
+      {/* 🎥 VÍDEO PERSUASIVO (NOVA SEÇÃO) */}
+      <section className="px-6 pb-20 relative z-20">
+          <div className="max-w-5xl mx-auto">
+              <div className="bg-gradient-to-b from-gray-800 to-black p-1 rounded-3xl shadow-2xl shadow-green-900/20 border border-white/10">
+                  <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black">
+                      <iframe 
+                        className="w-full h-full" 
+                        src="https://www.youtube.com/embed/vfKJIkoTT-c?si=bpJKgS6X80f_keNP" 
+                        title="Apresentação do Sistema SaaS" 
+                        frameBorder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                        referrerPolicy="strict-origin-when-cross-origin" 
+                        allowFullScreen
+                      ></iframe>
+                  </div>
+              </div>
+              <div className="text-center mt-6">
+                 <p className="text-gray-400 text-sm flex items-center justify-center gap-2">
+                    <PlayCircle size={16} className="text-green-500"/> Assista ao vídeo e veja o potencial de lucro deste sistema.
+                 </p>
+              </div>
+          </div>
+      </section>
 
       {/* TECH STACK */}
       <section className="py-10 border-y border-white/5 bg-white/2 relative z-10">
@@ -123,7 +147,7 @@ export default function HotmartSalesPage() {
           </div>
       </section>
 
-      {/* DEMONSTRAÇÃO AO VIVO (NOVO BLOCO) 🚀 */}
+      {/* DEMONSTRAÇÃO AO VIVO */}
       <section className="py-24 px-6 bg-[#0b1120] border-y border-white/5 relative z-10">
           <div className="max-w-4xl mx-auto text-center space-y-8">
               <div className="inline-flex items-center gap-2 bg-blue-500/10 text-blue-400 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border border-blue-500/20">
@@ -139,7 +163,7 @@ export default function HotmartSalesPage() {
               </p>
               
               <div className="pt-4">
-                  <a href="https://cardapiocerto.com.br" target="_blank" className="inline-flex bg-white/5 hover:bg-white/10 text-white border border-white/10 px-8 py-4 rounded-xl font-bold text-lg transition transform hover:scale-105 items-center gap-3">
+                  <a href="https://cardapiocerto.com.br" target="_blank" rel="noopener noreferrer" className="inline-flex bg-white/5 hover:bg-white/10 text-white border border-white/10 px-8 py-4 rounded-xl font-bold text-lg transition transform hover:scale-105 items-center gap-3">
                       <ExternalLink size={20} className="text-blue-400"/>
                       ACESSAR DEMONSTRAÇÃO AO VIVO
                   </a>
@@ -168,7 +192,7 @@ export default function HotmartSalesPage() {
                   <p className="text-xs text-green-400 mt-2 font-medium">Pagamento Único • Acesso Vitalício</p>
               </div>
 
-              <a href={HOTMART_LINK} className="inline-flex bg-green-500 hover:bg-green-400 text-black text-xl px-12 py-5 rounded-2xl font-black shadow-xl shadow-green-500/20 transition transform hover:scale-105 items-center gap-3">
+              <a href={HOTMART_LINK} target="_blank" rel="noopener noreferrer" className="inline-flex bg-green-500 hover:bg-green-400 text-black text-xl px-12 py-5 rounded-2xl font-black shadow-xl shadow-green-500/20 transition transform hover:scale-105 items-center gap-3">
                   COMPRAR SISTEMA AGORA <ArrowRight size={24}/>
               </a>
 
